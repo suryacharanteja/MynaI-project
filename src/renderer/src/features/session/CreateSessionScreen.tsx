@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Briefcase, Phone, FileText, User, Plus, Sparkles, MessageSquare } from 'lucide-react'
+import { Briefcase, Phone, FileText, User, Plus, Sparkles, MessageSquare, Settings } from 'lucide-react'
 import { useSessionStore } from '../../stores/session-store'
 import { FieldLabel, TextArea, TextInput } from '../../components/ui/field-shell'
 import { Toggle } from '../../components/ui/toggle'
+import { SettingsModal } from '../settings/SettingsModal'
 
 const MODEL_OPTIONS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gpt-4o-mini', 'claude-haiku-4-5']
 const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Spanish', 'French']
@@ -10,19 +11,39 @@ const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Spanish', 'French']
 export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): React.JSX.Element {
   const { form, setSessionType, setField } = useSessionStore()
   const [activeTab, setActiveTab] = useState<'create' | 'sessions'>('create')
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
+
+  async function handleCreate(): Promise<void> {
+    setCreating(true)
+    try {
+      await window.mynai.createSession(form)
+      onCreate?.()
+    } finally {
+      setCreating(false)
+    }
+  }
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-neutral-950/95 text-neutral-100 shadow-2xl backdrop-blur-xl">
+    <div className="relative flex h-full w-full flex-col overflow-hidden rounded-2xl border border-black/10 bg-white/95 text-neutral-900 shadow-2xl backdrop-blur-xl">
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+
       {/* Top bar */}
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+      <div className="flex items-center justify-between border-b border-black/10 px-4 py-3">
         <div className="flex items-center gap-2 font-semibold">
           <span className="text-lg">🦜</span>
           <span>MynaI</span>
         </div>
+        <button
+          onClick={() => setSettingsOpen(true)}
+          className="rounded-full p-1.5 text-neutral-500 transition hover:bg-black/5 hover:text-neutral-900"
+        >
+          <Settings size={16} />
+        </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-white/10 px-4 pt-3">
+      <div className="flex gap-1 border-b border-black/10 px-4 pt-3">
         {(
           [
             ['create', 'Create'],
@@ -33,7 +54,7 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
             key={key}
             onClick={() => setActiveTab(key)}
             className={`rounded-t-lg px-4 py-2 text-sm font-medium transition ${
-              activeTab === key ? 'bg-white/10 text-white' : 'text-neutral-400 hover:text-neutral-200'
+              activeTab === key ? 'bg-black/[0.06] text-neutral-900' : 'text-neutral-400 hover:text-neutral-700'
             }`}
           >
             {label}
@@ -42,7 +63,7 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
       </div>
 
       {activeTab === 'sessions' ? (
-        <div className="flex flex-1 items-center justify-center text-sm text-neutral-500">
+        <div className="flex flex-1 items-center justify-center text-sm text-neutral-400">
           No call sessions yet.
         </div>
       ) : (
@@ -55,8 +76,8 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
                 onClick={() => setSessionType('interview')}
                 className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
                   form.sessionType === 'interview'
-                    ? 'border-white/25 bg-white/10 text-white'
-                    : 'border-white/10 bg-white/5 text-neutral-400 hover:text-neutral-200'
+                    ? 'border-black/20 bg-black/[0.06] text-neutral-900'
+                    : 'border-black/10 bg-black/[0.02] text-neutral-400 hover:text-neutral-700'
                 }`}
               >
                 <Briefcase size={16} /> Interview
@@ -65,8 +86,8 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
                 onClick={() => setSessionType('regular-call')}
                 className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
                   form.sessionType === 'regular-call'
-                    ? 'border-white/25 bg-white/10 text-white'
-                    : 'border-white/10 bg-white/5 text-neutral-400 hover:text-neutral-200'
+                    ? 'border-black/20 bg-black/[0.06] text-neutral-900'
+                    : 'border-black/10 bg-black/[0.02] text-neutral-400 hover:text-neutral-700'
                 }`}
               >
                 <Phone size={16} /> Regular Call
@@ -78,7 +99,7 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
           <div>
             <div className="mb-1.5 flex items-center justify-between">
               <FieldLabel icon={<Briefcase size={14} />}>Company</FieldLabel>
-              <button className="flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-200">
+              <button className="flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-700">
                 <Sparkles size={12} /> Fill fields from Job Post URL
               </button>
             </div>
@@ -104,13 +125,13 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
           <div>
             <FieldLabel>Context</FieldLabel>
             <div className="flex flex-wrap gap-2">
-              <button className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-neutral-200 hover:bg-white/10">
+              <button className="flex items-center gap-1.5 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-1.5 text-sm text-neutral-700 hover:bg-black/[0.06]">
                 <User size={14} /> {form.profileId ?? 'Select Profile'}
               </button>
-              <button className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-neutral-200 hover:bg-white/10">
+              <button className="flex items-center gap-1.5 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-1.5 text-sm text-neutral-700 hover:bg-black/[0.06]">
                 <Plus size={14} /> Add Documents
               </button>
-              <button className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-neutral-200 hover:bg-white/10">
+              <button className="flex items-center gap-1.5 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-1.5 text-sm text-neutral-700 hover:bg-black/[0.06]">
                 <Plus size={14} /> Add Extra Context
               </button>
             </div>
@@ -123,7 +144,7 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
               <select
                 value={form.model}
                 onChange={(e) => setField('model', e.target.value)}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-neutral-200 outline-none"
+                className="rounded-lg border border-black/10 bg-black/[0.02] px-3 py-1.5 text-sm text-neutral-700 outline-none"
               >
                 {MODEL_OPTIONS.map((m) => (
                   <option key={m} value={m}>
@@ -134,7 +155,7 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
               <select
                 value={form.outputLanguage}
                 onChange={(e) => setField('outputLanguage', e.target.value)}
-                className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-neutral-200 outline-none"
+                className="rounded-lg border border-black/10 bg-black/[0.02] px-3 py-1.5 text-sm text-neutral-700 outline-none"
               >
                 {LANGUAGE_OPTIONS.map((l) => (
                   <option key={l} value={l}>
@@ -142,7 +163,7 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
                   </option>
                 ))}
               </select>
-              <button className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-neutral-200 hover:bg-white/10">
+              <button className="flex items-center gap-1.5 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-1.5 text-sm text-neutral-700 hover:bg-black/[0.06]">
                 <MessageSquare size={14} /> Answer Preferences
               </button>
             </div>
@@ -169,12 +190,13 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
       )}
 
       {activeTab === 'create' && (
-        <div className="border-t border-white/10 p-3">
+        <div className="border-t border-black/10 p-3">
           <button
-            onClick={onCreate}
-            className="w-full rounded-lg bg-white/10 py-2.5 text-sm font-medium text-white transition hover:bg-white/20"
+            onClick={handleCreate}
+            disabled={creating}
+            className="w-full rounded-lg bg-neutral-900 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-700 disabled:opacity-50"
           >
-            Create Session
+            {creating ? 'Creating…' : 'Create Session'}
           </button>
         </div>
       )}

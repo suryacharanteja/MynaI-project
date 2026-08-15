@@ -1,13 +1,37 @@
-import { app } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import { createOverlayWindow } from './windows/overlay'
+import { registerIpcHandlers } from './ipc'
 
-app.whenReady().then(() => {
-  createOverlayWindow({
-    defaultWidth: 900,
-    defaultHeight: 700,
-    minWidth: 360,
-    minHeight: 240,
-    hideFromScreenCapture: true,
-    launchHidden: false
+let overlayWindow: BrowserWindow | null = null
+
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+
+if (!gotSingleInstanceLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (overlayWindow) {
+      if (overlayWindow.isMinimized()) overlayWindow.restore()
+      overlayWindow.show()
+      overlayWindow.focus()
+    }
   })
-})
+
+  app.whenReady().then(() => {
+    overlayWindow = createOverlayWindow({
+      defaultWidth: 420,
+      defaultHeight: 640,
+      minWidth: 360,
+      minHeight: 240,
+      hideFromScreenCapture: true,
+      launchHidden: false
+    })
+    registerIpcHandlers(overlayWindow)
+  })
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+      app.quit()
+    }
+  })
+}
