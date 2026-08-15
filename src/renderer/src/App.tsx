@@ -1,12 +1,12 @@
+import { CreateSessionScreen } from './features/session/CreateSessionScreen'
+import { useSessionStore } from './stores/session-store'
+
 export default function App(): React.JSX.Element {
+  const form = useSessionStore((state) => state.form)
+
   return (
-    <div className="flex h-screen items-center justify-center bg-neutral-950 text-neutral-100">
-      <div className="text-center">
-        <h1 className="text-2xl font-semibold">MynaI</h1>
-        <p className="mt-2 text-sm text-neutral-400">
-          New React shell scaffolded. Create Session screen goes here next.
-        </p>
-      </div>
+    <div className="h-screen bg-transparent p-2">
+      <CreateSessionScreen onCreate={() => console.log('Create session:', form)} />
     </div>
   )
 }

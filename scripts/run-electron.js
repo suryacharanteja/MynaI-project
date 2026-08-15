@@ -11,7 +11,8 @@ const electronBinary = require('electron');
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 
-const args = ['.', ...process.argv.slice(2)];
+const path = require('path');
+const args = [path.join(__dirname, '..', 'src', 'main.js'), ...process.argv.slice(2)];
 const child = spawn(electronBinary, args, { stdio: 'inherit', env });
 
 child.on('exit', (code, signal) => {
