@@ -15,9 +15,8 @@ interface ModelOption {
 
 // Gemini list verified against the live /v1beta/models endpoint with a real key.
 // OpenAI list is best-effort from published docs — not verified against a live key yet.
-// OpenCode Go list reflects the models included in the user's "OpenCode Go" plan;
-// IDs are slugified guesses (opencode/<slug>) pending verification against a live key
-// via GET https://opencode.ai/zen/go/v1/models, the same way Gemini's list was verified.
+// OpenCode Go list verified against GET https://opencode.ai/zen/go/v1/models with a real key —
+// note: no "opencode/" prefix on the IDs, unlike the general Zen product's convention.
 const PROVIDER_LABELS: Record<LlmProvider, string> = {
   gemini: 'Gemini',
   openai: 'OpenAI',
@@ -30,25 +29,32 @@ const PROVIDER_MODELS: Record<LlmProvider, ModelOption[]> = {
   })),
   openai: ['gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex'].map((m) => ({ value: m, label: m })),
   'opencode-go': [
-    { value: 'opencode/grok-4.5', label: 'Grok 4.5' },
-    { value: 'opencode/glm-5.3', label: 'GLM-5.3' },
-    { value: 'opencode/glm-5.2', label: 'GLM-5.2' },
-    { value: 'opencode/glm-5.1', label: 'GLM-5.1' },
-    { value: 'opencode/gpt-5.6-luna', label: 'GPT 5.6 Luna' },
-    { value: 'opencode/kimi-k3', label: 'Kimi K3' },
-    { value: 'opencode/kimi-k2.7-code', label: 'Kimi K2.7 Code' },
-    { value: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
-    { value: 'opencode/mimo-v2.5', label: 'MiMo-V2.5' },
-    { value: 'opencode/mimo-v2.5-pro', label: 'MiMo-V2.5-Pro' },
-    { value: 'opencode/minimax-m3', label: 'MiniMax M3' },
-    { value: 'opencode/minimax-m2.7', label: 'MiniMax M2.7' },
-    { value: 'opencode/qwen3.8-max', label: 'Qwen3.8 Max' },
-    { value: 'opencode/qwen3.7-max', label: 'Qwen3.7 Max' },
-    { value: 'opencode/qwen3.7-plus', label: 'Qwen3.7 Plus' },
-    { value: 'opencode/qwen3.6-plus', label: 'Qwen3.6 Plus' },
-    { value: 'opencode/deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
-    { value: 'opencode/deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
-    { value: 'opencode/hy3', label: 'Hy3' }
+    { value: 'grok-4.5', label: 'Grok 4.5' },
+    { value: 'glm-5.3', label: 'GLM-5.3' },
+    { value: 'glm-5.2', label: 'GLM-5.2' },
+    { value: 'glm-5.1', label: 'GLM-5.1' },
+    { value: 'glm-5', label: 'GLM-5' },
+    { value: 'gpt-5.6-luna', label: 'GPT 5.6 Luna' },
+    { value: 'kimi-k3', label: 'Kimi K3' },
+    { value: 'kimi-k2.7-code', label: 'Kimi K2.7 Code' },
+    { value: 'kimi-k2.6', label: 'Kimi K2.6' },
+    { value: 'kimi-k2.5', label: 'Kimi K2.5' },
+    { value: 'mimo-v2.5', label: 'MiMo-V2.5' },
+    { value: 'mimo-v2.5-pro', label: 'MiMo-V2.5-Pro' },
+    { value: 'mimo-v2-pro', label: 'MiMo-V2-Pro' },
+    { value: 'mimo-v2-omni', label: 'MiMo-V2-Omni' },
+    { value: 'minimax-m3', label: 'MiniMax M3' },
+    { value: 'minimax-m2.7', label: 'MiniMax M2.7' },
+    { value: 'minimax-m2.5', label: 'MiniMax M2.5' },
+    { value: 'qwen3.8-max', label: 'Qwen3.8 Max' },
+    { value: 'qwen3.7-max', label: 'Qwen3.7 Max' },
+    { value: 'qwen3.7-plus', label: 'Qwen3.7 Plus' },
+    { value: 'qwen3.6-plus', label: 'Qwen3.6 Plus' },
+    { value: 'qwen3.5-plus', label: 'Qwen3.5 Plus' },
+    { value: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
+    { value: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
+    { value: 'hy3', label: 'Hy3' },
+    { value: 'hy3-preview', label: 'Hy3 Preview' }
   ]
 }
 const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Spanish', 'French']
