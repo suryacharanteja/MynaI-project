@@ -1,4 +1,5 @@
 import type { CreateSessionForm, LlmProvider } from './session-types'
+import type { DesktopSource, SttErrorEvent, SttStatusEvent, SttTranscriptEvent } from './stt-types'
 
 export type { LlmProvider } from './session-types'
 
@@ -7,7 +8,15 @@ export const IPC_CHANNELS = {
   setSettings: 'app:setSettings',
   createSession: 'session:create',
   listSessions: 'session:list',
-  askAi: 'ai:ask'
+  askAi: 'ai:ask',
+  sttGetDesktopSources: 'stt:getDesktopSources',
+  sttStart: 'stt:start',
+  sttStop: 'stt:stop',
+  sttAudioChunk: 'stt:audioChunk',
+  sttStatus: 'stt:status',
+  sttPartial: 'stt:partial',
+  sttFinal: 'stt:final',
+  sttError: 'stt:error'
 } as const
 
 export interface AppSettings {
@@ -59,10 +68,23 @@ export interface AskAiError {
   error: string
 }
 
+export interface SttStartResult {
+  success: boolean
+  error?: string
+}
+
 export interface MynaiApi {
   getSettings: () => Promise<AppSettings>
   setSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>
   createSession: (form: CreateSessionForm) => Promise<CreateSessionResult>
   listSessions: () => Promise<SessionSummary[]>
   askAi: (request: AskAiRequest) => Promise<AskAiResult | AskAiError>
+  sttGetDesktopSources: () => Promise<DesktopSource[]>
+  sttStart: (source: string) => Promise<SttStartResult>
+  sttStop: (source: string) => Promise<void>
+  sttSendAudioChunk: (source: string, data: ArrayBuffer) => void
+  onSttStatus: (callback: (event: SttStatusEvent) => void) => () => void
+  onSttPartial: (callback: (event: SttTranscriptEvent) => void) => () => void
+  onSttFinal: (callback: (event: SttTranscriptEvent) => void) => () => void
+  onSttError: (callback: (event: SttErrorEvent) => void) => () => void
 }

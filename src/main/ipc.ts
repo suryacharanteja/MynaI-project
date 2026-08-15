@@ -1,4 +1,4 @@
-import { ipcMain, type BrowserWindow } from 'electron'
+import { desktopCapturer, ipcMain, type BrowserWindow, type IpcMainEvent } from 'electron'
 import {
   IPC_CHANNELS,
   type AppSettings,
@@ -6,12 +6,15 @@ import {
   type AskAiRequest,
   type AskAiResult,
   type CreateSessionResult,
-  type SessionSummary
+  type SessionSummary,
+  type SttStartResult
 } from '../shared/ipc-contract'
+import type { DesktopSource } from '../shared/stt-types'
 import type { CreateSessionForm } from '../shared/session-types'
 import { readSettings, writeSettings } from './store'
 import { askLlm } from './services/llm/router'
 import { createSession, listSessions } from './sessions/store'
+import { createAssemblyAiSttService } from './services/stt/assemblyai'
 
 const PROVIDER_LABELS = { gemini: 'Gemini', openai: 'OpenAI', 'opencode-go': 'OpenCode Go' } as const
 
@@ -26,7 +29,7 @@ function apiKeyForProvider(settings: AppSettings, provider: AskAiRequest['provid
   }
 }
 
-export function registerIpcHandlers(_window: BrowserWindow): void {
+export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle(IPC_CHANNELS.getSettings, () => readSettings())
 
   ipcMain.handle(IPC_CHANNELS.setSettings, (_event, patch: Partial<AppSettings>) => {
@@ -64,4 +67,28 @@ export function registerIpcHandlers(_window: BrowserWindow): void {
       }
     }
   )
+
+  const stt = createAssemblyAiSttService(window.webContents)
+  window.on('closed', () => stt.dispose())
+
+  ipcMain.handle(IPC_CHANNELS.sttGetDesktopSources, async (): Promise<DesktopSource[]> => {
+    const sources = await desktopCapturer.getSources({ types: ['screen'] })
+    return sources.map((s) => ({ id: s.id, name: s.name }))
+  })
+
+  ipcMain.handle(IPC_CHANNELS.sttStart, (_event, source: string): SttStartResult => {
+    const settings = readSettings()
+    if (!settings.assemblyAiApiKey) {
+      return { success: false, error: 'AssemblyAI API key not configured. Add it in Settings.' }
+    }
+    return stt.start(source, settings.assemblyAiApiKey)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.sttStop, (_event, source: string) => {
+    stt.stop(source)
+  })
+
+  ipcMain.on(IPC_CHANNELS.sttAudioChunk, (_event: IpcMainEvent, { source, data }: { source: string; data: ArrayBuffer }) => {
+    stt.pushAudioChunk(source, data)
+  })
 }

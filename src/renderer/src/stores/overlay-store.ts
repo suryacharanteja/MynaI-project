@@ -3,6 +3,8 @@ import type { AnswerCard, TranscriptMessage } from '@shared/transcript-types'
 
 interface OverlayStore {
   transcript: TranscriptMessage[]
+  partialText: { mic: string; system: string }
+  sttStatus: { mic: string; system: string }
   cards: AnswerCard[]
   activeCardIndex: number
   autoAnswerOn: boolean
@@ -10,6 +12,8 @@ interface OverlayStore {
   micLevel: number
 
   addTranscriptMessage: (message: TranscriptMessage) => void
+  setPartialText: (source: 'mic' | 'system', text: string) => void
+  setSttStatus: (source: 'mic' | 'system', status: string) => void
   addCard: (card: AnswerCard) => void
   updateCard: (id: string, patch: Partial<AnswerCard>) => void
   setActiveCardIndex: (index: number) => void
@@ -22,6 +26,8 @@ interface OverlayStore {
 
 export const useOverlayStore = create<OverlayStore>((set, get) => ({
   transcript: [],
+  partialText: { mic: '', system: '' },
+  sttStatus: { mic: 'off', system: 'off' },
   cards: [],
   activeCardIndex: 0,
   autoAnswerOn: true,
@@ -30,6 +36,11 @@ export const useOverlayStore = create<OverlayStore>((set, get) => ({
 
   addTranscriptMessage: (message) =>
     set((state) => ({ transcript: [...state.transcript.slice(-49), message] })),
+
+  setPartialText: (source, text) =>
+    set((state) => ({ partialText: { ...state.partialText, [source]: text } })),
+
+  setSttStatus: (source, status) => set((state) => ({ sttStatus: { ...state.sttStatus, [source]: status } })),
 
   addCard: (card) =>
     set((state) => ({

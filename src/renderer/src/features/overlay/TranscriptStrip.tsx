@@ -1,20 +1,36 @@
 import { useEffect, useRef } from 'react'
-import { Mic, Radio, Sparkles } from 'lucide-react'
+import { Mic, MicOff, Radio, Sparkles } from 'lucide-react'
 import { useOverlayStore } from '../../stores/overlay-store'
 
-export function TranscriptStrip(): React.JSX.Element {
+export function TranscriptStrip({
+  micOn,
+  onToggleMic
+}: {
+  micOn: boolean
+  onToggleMic: () => void
+}): React.JSX.Element {
   const transcript = useOverlayStore((s) => s.transcript)
-  const micLevel = useOverlayStore((s) => s.micLevel)
+  const partialText = useOverlayStore((s) => s.partialText)
+  const sttStatus = useOverlayStore((s) => s.sttStatus)
   const questionDetected = useOverlayStore((s) => s.questionDetected)
   const autoAnswerOn = useOverlayStore((s) => s.autoAnswerOn)
   const setAutoAnswerOn = useOverlayStore((s) => s.setAutoAnswerOn)
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  const liveText = [
+    transcript.map((m) => m.text).join(' '),
+    partialText.system,
+    partialText.mic
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ left: scrollRef.current.scrollWidth })
-  }, [transcript])
+  }, [liveText])
 
-  const text = transcript.map((m) => m.text).join(' ')
+  const isListening = sttStatus.system === 'listening' || sttStatus.mic === 'listening'
+  const isConnecting = sttStatus.system === 'connecting' || sttStatus.mic === 'connecting'
 
   return (
     <div
@@ -22,24 +38,14 @@ export function TranscriptStrip(): React.JSX.Element {
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       title="Drag anywhere on this bar to move the window"
     >
-      <div className="flex items-center gap-1.5 text-neutral-400">
-        <Radio size={14} />
-        <div className="flex h-3.5 items-end gap-[2px]">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <span
-              key={i}
-              className="w-[2px] rounded-full bg-emerald-400 transition-all"
-              style={{
-                height: `${Math.max(2, Math.min(14, micLevel * 14 - i * 2))}px`,
-                opacity: micLevel * 14 > i * 2.5 ? 1 : 0.25
-              }}
-            />
-          ))}
-        </div>
+      <div className="flex items-center gap-1.5 text-neutral-400" title={`System audio: ${sttStatus.system}`}>
+        <Radio size={14} className={isListening ? 'text-emerald-400' : undefined} />
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-hidden whitespace-nowrap text-sm text-neutral-300">
-        <span className="opacity-80">{text || 'Listening…'}</span>
+        <span className="opacity-80">
+          {liveText || (isConnecting ? 'Connecting…' : isListening ? 'Listening…' : 'Not listening')}
+        </span>
       </div>
 
       {questionDetected && (
@@ -60,7 +66,16 @@ export function TranscriptStrip(): React.JSX.Element {
         Auto Answer {autoAnswerOn ? 'On' : 'Off'}
       </button>
 
-      <Mic size={14} className="shrink-0 text-neutral-500" />
+      <button
+        onClick={onToggleMic}
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        title={micOn ? 'Mic on — click to mute' : 'Mic off — click to enable'}
+        className={`shrink-0 rounded-full p-1.5 transition ${
+          micOn ? 'bg-white/15 text-emerald-400' : 'bg-white/5 text-neutral-500'
+        }`}
+      >
+        {micOn ? <Mic size={14} /> : <MicOff size={14} />}
+      </button>
     </div>
   )
 }
