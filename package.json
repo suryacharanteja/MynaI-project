@@ -10,7 +10,9 @@
     "build": "node scripts/run-build.js",
     "build:win": "node scripts/run-build.js --win portable",
     "build:mac": "node scripts/run-build.js --mac",
-    "build:linux": "node scripts/run-build.js --linux"
+    "build:linux": "node scripts/run-build.js --linux",
+    "dev:shell": "electron-vite dev",
+    "build:shell": "electron-vite build"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -19,9 +21,20 @@
     "ws": "^8.19.0"
   },
   "devDependencies": {
+    "@electron-toolkit/tsconfig": "^2.0.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^4.7.0",
     "electron": "^28.3.3",
     "electron-builder": "^24.13.3",
-    "esbuild": "^0.25.6"
+    "electron-vite": "^5.0.0",
+    "esbuild": "^0.25.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.6"
   },
   "build": {
     "appId": "com.google.chrome",
