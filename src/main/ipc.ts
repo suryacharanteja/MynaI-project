@@ -13,7 +13,7 @@ import { readSettings, writeSettings } from './store'
 import { askLlm } from './services/llm/router'
 import { createSession, listSessions } from './sessions/store'
 
-const PROVIDER_LABELS = { gemini: 'Gemini', openai: 'OpenAI', 'opencode-zen': 'OpenCode Zen' } as const
+const PROVIDER_LABELS = { gemini: 'Gemini', openai: 'OpenAI', 'opencode-go': 'OpenCode Go' } as const
 
 function apiKeyForProvider(settings: AppSettings, provider: AskAiRequest['provider']): string | null {
   switch (provider) {
@@ -21,8 +21,8 @@ function apiKeyForProvider(settings: AppSettings, provider: AskAiRequest['provid
       return settings.geminiApiKey
     case 'openai':
       return settings.openaiApiKey
-    case 'opencode-zen':
-      return settings.openCodeZenApiKey
+    case 'opencode-go':
+      return settings.openCodeGoApiKey
   }
 }
 

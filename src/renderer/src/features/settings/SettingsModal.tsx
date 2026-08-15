@@ -7,7 +7,7 @@ import { TextInput } from '../../components/ui/field-shell'
 const KEY_FIELDS: { key: keyof AppSettings; label: string; placeholder: string }[] = [
   { key: 'geminiApiKey', label: 'Gemini API Key', placeholder: 'AIza...' },
   { key: 'openaiApiKey', label: 'OpenAI API Key', placeholder: 'sk-...' },
-  { key: 'openCodeZenApiKey', label: 'OpenCode Zen API Key', placeholder: '...' },
+  { key: 'openCodeGoApiKey', label: 'OpenCode Go API Key', placeholder: '...' },
   { key: 'assemblyAiApiKey', label: 'AssemblyAI API Key', placeholder: '...' }
 ]
 

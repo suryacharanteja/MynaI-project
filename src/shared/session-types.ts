@@ -1,5 +1,5 @@
 export type SessionType = 'interview' | 'regular-call'
-export type LlmProvider = 'gemini' | 'openai' | 'opencode-zen'
+export type LlmProvider = 'gemini' | 'openai' | 'opencode-go'
 
 export interface AnswerPreferences {
   tone: 'conversational' | 'formal' | 'concise'

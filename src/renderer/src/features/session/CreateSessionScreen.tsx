@@ -8,17 +8,48 @@ import { SettingsModal } from '../settings/SettingsModal'
 import { TitleBar } from '../../components/ui/title-bar'
 import { CallSessionsList } from './CallSessionsList'
 
+interface ModelOption {
+  value: string
+  label: string
+}
+
 // Gemini list verified against the live /v1beta/models endpoint with a real key.
-// OpenAI/Zen lists are best-effort from published docs — not verified against a live key yet.
+// OpenAI list is best-effort from published docs — not verified against a live key yet.
+// OpenCode Go list reflects the models included in the user's "OpenCode Go" plan;
+// IDs are slugified guesses (opencode/<slug>) pending verification against a live key
+// via GET https://opencode.ai/zen/go/v1/models, the same way Gemini's list was verified.
 const PROVIDER_LABELS: Record<LlmProvider, string> = {
   gemini: 'Gemini',
   openai: 'OpenAI',
-  'opencode-zen': 'OpenCode Zen'
+  'opencode-go': 'OpenCode Go'
 }
-const PROVIDER_MODELS: Record<LlmProvider, string[]> = {
-  gemini: ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.5-pro'],
-  openai: ['gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex'],
-  'opencode-zen': ['opencode/gpt-5.6-sol', 'opencode/claude-sonnet-5', 'opencode/gemini-3.7-flash']
+const PROVIDER_MODELS: Record<LlmProvider, ModelOption[]> = {
+  gemini: ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.5-pro'].map((m) => ({
+    value: m,
+    label: m
+  })),
+  openai: ['gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex'].map((m) => ({ value: m, label: m })),
+  'opencode-go': [
+    { value: 'opencode/grok-4.5', label: 'Grok 4.5' },
+    { value: 'opencode/glm-5.3', label: 'GLM-5.3' },
+    { value: 'opencode/glm-5.2', label: 'GLM-5.2' },
+    { value: 'opencode/glm-5.1', label: 'GLM-5.1' },
+    { value: 'opencode/gpt-5.6-luna', label: 'GPT 5.6 Luna' },
+    { value: 'opencode/kimi-k3', label: 'Kimi K3' },
+    { value: 'opencode/kimi-k2.7-code', label: 'Kimi K2.7 Code' },
+    { value: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
+    { value: 'opencode/mimo-v2.5', label: 'MiMo-V2.5' },
+    { value: 'opencode/mimo-v2.5-pro', label: 'MiMo-V2.5-Pro' },
+    { value: 'opencode/minimax-m3', label: 'MiniMax M3' },
+    { value: 'opencode/minimax-m2.7', label: 'MiniMax M2.7' },
+    { value: 'opencode/qwen3.8-max', label: 'Qwen3.8 Max' },
+    { value: 'opencode/qwen3.7-max', label: 'Qwen3.7 Max' },
+    { value: 'opencode/qwen3.7-plus', label: 'Qwen3.7 Plus' },
+    { value: 'opencode/qwen3.6-plus', label: 'Qwen3.6 Plus' },
+    { value: 'opencode/deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
+    { value: 'opencode/deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
+    { value: 'opencode/hy3', label: 'Hy3' }
+  ]
 }
 const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Spanish', 'French']
 
@@ -30,7 +61,7 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
 
   function handleProviderChange(provider: LlmProvider): void {
     setField('provider', provider)
-    setField('model', PROVIDER_MODELS[provider][0])
+    setField('model', PROVIDER_MODELS[provider][0].value)
   }
 
   async function handleCreate(): Promise<void> {
@@ -170,8 +201,8 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
                 className="rounded-lg border border-black/10 bg-black/[0.02] px-3 py-1.5 text-sm text-neutral-700 outline-none"
               >
                 {PROVIDER_MODELS[form.provider].map((m) => (
-                  <option key={m} value={m}>
-                    {m}
+                  <option key={m.value} value={m.value}>
+                    {m.label}
                   </option>
                 ))}
               </select>

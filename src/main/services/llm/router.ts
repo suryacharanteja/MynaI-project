@@ -1,6 +1,6 @@
 import type { AskParams, AnswerResult, LlmProvider } from './types'
 import { askGemini } from './gemini'
-import { askOpenAi, askOpenCodeZen } from './openai-compatible'
+import { askOpenAi, askOpenCodeGo } from './openai-compatible'
 
 export function askLlm(provider: LlmProvider, params: AskParams): Promise<AnswerResult> {
   switch (provider) {
@@ -8,7 +8,7 @@ export function askLlm(provider: LlmProvider, params: AskParams): Promise<Answer
       return askGemini(params)
     case 'openai':
       return askOpenAi(params)
-    case 'opencode-zen':
-      return askOpenCodeZen(params)
+    case 'opencode-go':
+      return askOpenCodeGo(params)
   }
 }

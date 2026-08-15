@@ -2,8 +2,9 @@ import { type AskParams, type AnswerResult, buildPrompt, parseAnswerJson } from 
 
 /**
  * Works for any OpenAI-compatible chat/completions endpoint — real OpenAI,
- * and OpenCode Zen (https://opencode.ai/zen/v1/chat/completions) which proxies
- * ~50 models from multiple providers behind the same request shape.
+ * and OpenCode Go (https://opencode.ai/zen/go/v1/chat/completions), the curated
+ * low-cost coding-model subscription under the opencode.ai/zen console — a distinct
+ * base URL and API key from the general OpenCode Zen product.
  */
 export async function askOpenAiCompatible(
   params: AskParams,
@@ -40,6 +41,6 @@ export function askOpenAi(params: AskParams): Promise<AnswerResult> {
   return askOpenAiCompatible(params, { baseUrl: 'https://api.openai.com/v1', providerLabel: 'OpenAI' })
 }
 
-export function askOpenCodeZen(params: AskParams): Promise<AnswerResult> {
-  return askOpenAiCompatible(params, { baseUrl: 'https://opencode.ai/zen/v1', providerLabel: 'OpenCode Zen' })
+export function askOpenCodeGo(params: AskParams): Promise<AnswerResult> {
+  return askOpenAiCompatible(params, { baseUrl: 'https://opencode.ai/zen/go/v1', providerLabel: 'OpenCode Go' })
 }
