@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import { Send, Loader2 } from 'lucide-react'
-import { useOverlayStore } from '../../stores/overlay-store'
 import { useSessionStore } from '../../stores/session-store'
+import { askAiAndAddCard } from './ask-ai'
 
 export function AskAiBar(): React.JSX.Element {
   const [question, setQuestion] = useState('')
   const [asking, setAsking] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const addCard = useOverlayStore((s) => s.addCard)
-  const updateCard = useOverlayStore((s) => s.updateCard)
   const form = useSessionStore((s) => s.form)
 
   async function handleAsk(): Promise<void> {
@@ -17,48 +15,12 @@ export function AskAiBar(): React.JSX.Element {
 
     setAsking(true)
     setError(null)
-
-    const cardId = `card-${Date.now()}`
-    addCard({
-      id: cardId,
-      question: trimmed,
-      answer: '',
-      status: 'streaming',
-      createdAt: Date.now()
-    })
     setQuestion('')
 
-    try {
-      const result = await window.mynai.askAi({
-        question: trimmed,
-        provider: form.provider,
-        model: form.model,
-        company: form.company || undefined,
-        jobDescription: form.jobDescription || undefined,
-        extraContext: form.extraContext || undefined
-      })
+    const result = await askAiAndAddCard(trimmed, form)
+    if (result.error) setError(result.error)
 
-      if ('error' in result) {
-        updateCard(cardId, { answer: `⚠️ ${result.error}`, status: 'error' })
-        setError(result.error)
-      } else {
-        updateCard(cardId, {
-          answer: result.answer,
-          keySteps: result.keySteps,
-          code: result.code ?? undefined,
-          explanation: result.explanation || undefined,
-          timeComplexity: result.timeComplexity ?? undefined,
-          spaceComplexity: result.spaceComplexity ?? undefined,
-          status: 'done'
-        })
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Ask AI failed.'
-      updateCard(cardId, { answer: `⚠️ ${message}`, status: 'error' })
-      setError(message)
-    } finally {
-      setAsking(false)
-    }
+    setAsking(false)
   }
 
   return (

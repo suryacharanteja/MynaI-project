@@ -35,6 +35,19 @@ export function createAssemblyAiSttService(webContents: WebContents) {
       return { success: true }
     }
 
+    // A stale/orphaned socket (e.g. from a rapid stop+start, or a dev-mode
+    // double-mount) must be force-closed before opening a new one — otherwise
+    // both stay open, audio only reaches whichever is currently referenced, and
+    // the other idles until AssemblyAI kills it with a keepalive-timeout close.
+    if (state[resolvedSource].ws) {
+      try {
+        state[resolvedSource].ws!.terminate()
+      } catch {
+        // no-op
+      }
+      state[resolvedSource].ws = null
+    }
+
     const query = new URLSearchParams({
       sample_rate: String(SAMPLE_RATE),
       format_turns: 'true'
@@ -45,6 +58,7 @@ export function createAssemblyAiSttService(webContents: WebContents) {
     state[resolvedSource].ws = ws
 
     ws.on('open', () => {
+      console.log(`[stt:${resolvedSource}] ws open`)
       state[resolvedSource].streaming = true
       send('stt:status', { source: resolvedSource, status: 'connecting' })
     })
@@ -52,6 +66,7 @@ export function createAssemblyAiSttService(webContents: WebContents) {
     ws.on('message', (raw: Buffer) => {
       try {
         const msg = JSON.parse(raw.toString())
+        console.log(`[stt:${resolvedSource}] message`, msg.type, msg.transcript ?? '')
         switch (msg.type) {
           case 'Begin':
             send('stt:status', { source: resolvedSource, status: 'listening' })
@@ -69,17 +84,19 @@ export function createAssemblyAiSttService(webContents: WebContents) {
             send('stt:status', { source: resolvedSource, status: 'off' })
             break
         }
-      } catch {
-        // ignore malformed frames
+      } catch (err) {
+        console.log(`[stt:${resolvedSource}] parse error`, err, raw.toString().slice(0, 200))
       }
     })
 
     ws.on('error', (error: Error) => {
+      console.log(`[stt:${resolvedSource}] ws error`, error.message)
       send('stt:error', { source: resolvedSource, error: error.message })
       resetSource(resolvedSource)
     })
 
-    ws.on('close', () => {
+    ws.on('close', (code: number, reason: Buffer) => {
+      console.log(`[stt:${resolvedSource}] ws close`, code, reason.toString())
       if (state[resolvedSource].streaming) {
         resetSource(resolvedSource)
         send('stt:status', { source: resolvedSource, status: 'off' })
@@ -97,9 +114,18 @@ export function createAssemblyAiSttService(webContents: WebContents) {
   function stop(source: string): void {
     const resolvedSource = normalizeSource(source)
     const ws = state[resolvedSource].ws
-    if (ws && ws.readyState === WebSocket.OPEN) {
+    if (ws) {
       try {
-        ws.send(JSON.stringify({ type: 'Terminate' }))
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'Terminate' }))
+        }
+      } catch {
+        // no-op
+      }
+      // Sending Terminate alone doesn't close the socket — AssemblyAI's own
+      // Termination reply would, but we're not waiting for it, so force-close now.
+      try {
+        ws.terminate()
       } catch {
         // no-op
       }

@@ -6,12 +6,13 @@ interface SourceRuntime {
   stream: MediaStream | null
   processor: { disconnect: () => void } | null
   active: boolean
+  queue: Promise<void>
 }
 
 export function createAudioCapture(onMonitorLog?: (level: string, code: string, message: string) => void) {
   const runtime: Record<AudioSource, SourceRuntime> = {
-    mic: { context: null, stream: null, processor: null, active: false },
-    system: { context: null, stream: null, processor: null, active: false }
+    mic: { context: null, stream: null, processor: null, active: false, queue: Promise.resolve() },
+    system: { context: null, stream: null, processor: null, active: false, queue: Promise.resolve() }
   }
 
   const pipeline = createAudioPipeline({
@@ -19,7 +20,21 @@ export function createAudioCapture(onMonitorLog?: (level: string, code: string, 
     addMonitorLog: (level, _code, message) => onMonitorLog?.(level, _code, message)
   })
 
-  async function startMic(): Promise<void> {
+  /**
+   * Every start/stop for a given source is chained onto that source's queue, so
+   * operations always run in the order requested and each one only begins after
+   * the previous has fully settled (network calls included). This is what makes
+   * React StrictMode's dev-only mount→cleanup→mount sequence safe: it becomes
+   * connect→disconnect→reconnect instead of two connections racing over shared
+   * state. Production (single mount) just runs the one start, no extra churn.
+   */
+  function enqueue<T extends AudioSource>(source: T, op: () => Promise<void>): Promise<void> {
+    const next = runtime[source].queue.then(op, op)
+    runtime[source].queue = next.catch(() => undefined)
+    return next
+  }
+
+  async function doStartMic(): Promise<void> {
     if (runtime.mic.active) return
 
     const result = await window.mynai.sttStart('mic')
@@ -33,19 +48,25 @@ export function createAudioCapture(onMonitorLog?: (level: string, code: string, 
     pipeline.resetSourceSampleQueue('mic')
     const processor = await pipeline.buildAudioProcessor(context, stream, 'mic', () => runtime.mic.active)
 
-    runtime.mic = { context, stream, processor, active: true }
+    runtime.mic.context = context
+    runtime.mic.stream = stream
+    runtime.mic.processor = processor
+    runtime.mic.active = true
   }
 
-  async function stopMic(): Promise<void> {
+  async function doStopMic(): Promise<void> {
     if (!runtime.mic.active && !runtime.mic.context) return
     pipeline.drainSourceSampleQueue('mic', { flushPartial: true })
     pipeline.stopAudioResources(runtime.mic.context ?? undefined, runtime.mic.stream ?? undefined, runtime.mic.processor ?? undefined)
-    runtime.mic = { context: null, stream: null, processor: null, active: false }
+    runtime.mic.context = null
+    runtime.mic.stream = null
+    runtime.mic.processor = null
+    runtime.mic.active = false
     pipeline.resetChunkCounter('mic')
     await window.mynai.sttStop('mic')
   }
 
-  async function startSystem(): Promise<void> {
+  async function doStartSystem(): Promise<void> {
     if (runtime.system.active) return
 
     const sources = await window.mynai.sttGetDesktopSources()
@@ -67,10 +88,13 @@ export function createAudioCapture(onMonitorLog?: (level: string, code: string, 
     pipeline.resetSourceSampleQueue('system')
     const processor = await pipeline.buildAudioProcessor(context, stream, 'system', () => runtime.system.active)
 
-    runtime.system = { context, stream, processor, active: true }
+    runtime.system.context = context
+    runtime.system.stream = stream
+    runtime.system.processor = processor
+    runtime.system.active = true
   }
 
-  async function stopSystem(): Promise<void> {
+  async function doStopSystem(): Promise<void> {
     if (!runtime.system.active && !runtime.system.context) return
     pipeline.drainSourceSampleQueue('system', { flushPartial: true })
     pipeline.stopAudioResources(
@@ -78,10 +102,18 @@ export function createAudioCapture(onMonitorLog?: (level: string, code: string, 
       runtime.system.stream ?? undefined,
       runtime.system.processor ?? undefined
     )
-    runtime.system = { context: null, stream: null, processor: null, active: false }
+    runtime.system.context = null
+    runtime.system.stream = null
+    runtime.system.processor = null
+    runtime.system.active = false
     pipeline.resetChunkCounter('system')
     await window.mynai.sttStop('system')
   }
+
+  const startMic = (): Promise<void> => enqueue('mic', doStartMic)
+  const stopMic = (): Promise<void> => enqueue('mic', doStopMic)
+  const startSystem = (): Promise<void> => enqueue('system', doStartSystem)
+  const stopSystem = (): Promise<void> => enqueue('system', doStopSystem)
 
   async function stopAll(): Promise<void> {
     await Promise.all([stopMic(), stopSystem()])
