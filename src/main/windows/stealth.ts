@@ -10,7 +10,8 @@ export function applyStealth(win: BrowserWindow, hideFromScreenCapture: boolean)
     app.dock?.hide()
     win.setHiddenInMissionControl(true)
   } else if (process.platform === 'win32') {
-    win.setSkipTaskbar(true)
+    // MYNAI_DEV_VISIBLE bypasses skipTaskbar so desktop-automation tooling can find the window during testing.
+    win.setSkipTaskbar(process.env['MYNAI_DEV_VISIBLE'] !== '1')
     win.setAlwaysOnTop(true, 'pop-up-menu')
     win.setAppDetails({
       appId: 'SystemProcess',

@@ -23,7 +23,7 @@ if (!gotSingleInstanceLock) {
       defaultHeight: 640,
       minWidth: 360,
       minHeight: 240,
-      hideFromScreenCapture: true,
+      hideFromScreenCapture: process.env['MYNAI_DEV_VISIBLE'] !== '1',
       launchHidden: false
     })
     registerIpcHandlers(overlayWindow)

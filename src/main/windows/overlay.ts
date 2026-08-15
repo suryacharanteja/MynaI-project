@@ -38,7 +38,7 @@ export function createOverlayWindow(options: OverlayWindowOptions): BrowserWindo
     frame: false,
     transparent: true,
     alwaysOnTop: true,
-    skipTaskbar: true,
+    skipTaskbar: process.env['MYNAI_DEV_VISIBLE'] !== '1',
     resizable: true,
     minimizable: false,
     maximizable: false,

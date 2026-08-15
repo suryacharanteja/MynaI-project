@@ -17,7 +17,11 @@ export function TranscriptStrip(): React.JSX.Element {
   const text = transcript.map((m) => m.text).join(' ')
 
   return (
-    <div className="flex items-center gap-3 border-b border-white/10 bg-black/40 px-3 py-2">
+    <div
+      className="flex items-center gap-3 border-b border-white/10 bg-black/40 px-3 py-2"
+      style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      title="Drag anywhere on this bar to move the window"
+    >
       <div className="flex items-center gap-1.5 text-neutral-400">
         <Radio size={14} />
         <div className="flex h-3.5 items-end gap-[2px]">
@@ -47,6 +51,7 @@ export function TranscriptStrip(): React.JSX.Element {
 
       <button
         onClick={() => setAutoAnswerOn(!autoAnswerOn)}
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition ${
           autoAnswerOn ? 'bg-white/15 text-white' : 'bg-white/5 text-neutral-500'
         }`}

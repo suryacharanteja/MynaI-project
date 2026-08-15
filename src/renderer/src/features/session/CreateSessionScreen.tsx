@@ -4,6 +4,7 @@ import { useSessionStore } from '../../stores/session-store'
 import { FieldLabel, TextArea, TextInput } from '../../components/ui/field-shell'
 import { Toggle } from '../../components/ui/toggle'
 import { SettingsModal } from '../settings/SettingsModal'
+import { TitleBar } from '../../components/ui/title-bar'
 
 const MODEL_OPTIONS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gpt-4o-mini', 'claude-haiku-4-5']
 const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Spanish', 'French']
@@ -28,19 +29,14 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
     <div className="relative flex h-full w-full flex-col overflow-hidden rounded-2xl border border-black/10 bg-white/95 text-neutral-900 shadow-2xl backdrop-blur-xl">
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
 
-      {/* Top bar */}
-      <div className="flex items-center justify-between border-b border-black/10 px-4 py-3">
-        <div className="flex items-center gap-2 font-semibold">
-          <span className="text-lg">🦜</span>
-          <span>MynaI</span>
-        </div>
+      <TitleBar>
         <button
           onClick={() => setSettingsOpen(true)}
           className="rounded-full p-1.5 text-neutral-500 transition hover:bg-black/5 hover:text-neutral-900"
         >
           <Settings size={16} />
         </button>
-      </div>
+      </TitleBar>
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-black/10 px-4 pt-3">
