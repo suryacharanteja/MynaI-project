@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react'
 import { X, KeyRound, Check } from 'lucide-react'
 import type { AppSettings } from '@shared/ipc-contract'
+import { defaultAppSettings } from '@shared/ipc-contract'
 import { TextInput } from '../../components/ui/field-shell'
 
+const KEY_FIELDS: { key: keyof AppSettings; label: string; placeholder: string }[] = [
+  { key: 'geminiApiKey', label: 'Gemini API Key', placeholder: 'AIza...' },
+  { key: 'openaiApiKey', label: 'OpenAI API Key', placeholder: 'sk-...' },
+  { key: 'openCodeZenApiKey', label: 'OpenCode Zen API Key', placeholder: '...' },
+  { key: 'assemblyAiApiKey', label: 'AssemblyAI API Key', placeholder: '...' }
+]
+
 export function SettingsModal({ onClose }: { onClose: () => void }): React.JSX.Element {
-  const [settings, setSettings] = useState<AppSettings>({ geminiApiKey: null, assemblyAiApiKey: null })
+  const [settings, setSettings] = useState<AppSettings>(defaultAppSettings)
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -38,24 +46,17 @@ export function SettingsModal({ onClose }: { onClose: () => void }): React.JSX.E
           <p className="py-4 text-center text-sm text-neutral-500">Loading…</p>
         ) : (
           <div className="space-y-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600">Gemini API Key</label>
-              <TextInput
-                type="password"
-                placeholder="AIza..."
-                value={settings.geminiApiKey ?? ''}
-                onChange={(e) => setSettings((s) => ({ ...s, geminiApiKey: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600">AssemblyAI API Key</label>
-              <TextInput
-                type="password"
-                placeholder="..."
-                value={settings.assemblyAiApiKey ?? ''}
-                onChange={(e) => setSettings((s) => ({ ...s, assemblyAiApiKey: e.target.value }))}
-              />
-            </div>
+            {KEY_FIELDS.map(({ key, label, placeholder }) => (
+              <div key={key}>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">{label}</label>
+                <TextInput
+                  type="password"
+                  placeholder={placeholder}
+                  value={settings[key] ?? ''}
+                  onChange={(e) => setSettings((s) => ({ ...s, [key]: e.target.value }))}
+                />
+              </div>
+            ))}
             <button
               onClick={handleSave}
               className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-neutral-900 py-2 text-sm font-medium text-white transition hover:bg-neutral-700"

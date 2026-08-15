@@ -1,4 +1,5 @@
 export type SessionType = 'interview' | 'regular-call'
+export type LlmProvider = 'gemini' | 'openai' | 'opencode-zen'
 
 export interface AnswerPreferences {
   tone: 'conversational' | 'formal' | 'concise'
@@ -14,6 +15,7 @@ export interface CreateSessionForm {
   profileId: string | null
   extraContext: string
   documentIds: string[]
+  provider: LlmProvider
   model: string
   outputLanguage: string
   answerPreferences: AnswerPreferences
@@ -28,7 +30,8 @@ export const defaultCreateSessionForm: CreateSessionForm = {
   profileId: null,
   extraContext: '',
   documentIds: [],
-  model: 'gemini-2.5-flash-lite',
+  provider: 'gemini',
+  model: 'gemini-flash-latest',
   outputLanguage: 'English',
   answerPreferences: {
     tone: 'conversational',

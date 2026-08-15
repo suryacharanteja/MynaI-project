@@ -1,12 +1,25 @@
 import { useState } from 'react'
 import { Briefcase, Phone, FileText, User, Plus, Sparkles, MessageSquare, Settings } from 'lucide-react'
+import type { LlmProvider } from '@shared/session-types'
 import { useSessionStore } from '../../stores/session-store'
 import { FieldLabel, TextArea, TextInput } from '../../components/ui/field-shell'
 import { Toggle } from '../../components/ui/toggle'
 import { SettingsModal } from '../settings/SettingsModal'
 import { TitleBar } from '../../components/ui/title-bar'
+import { CallSessionsList } from './CallSessionsList'
 
-const MODEL_OPTIONS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gpt-4o-mini', 'claude-haiku-4-5']
+// Gemini list verified against the live /v1beta/models endpoint with a real key.
+// OpenAI/Zen lists are best-effort from published docs — not verified against a live key yet.
+const PROVIDER_LABELS: Record<LlmProvider, string> = {
+  gemini: 'Gemini',
+  openai: 'OpenAI',
+  'opencode-zen': 'OpenCode Zen'
+}
+const PROVIDER_MODELS: Record<LlmProvider, string[]> = {
+  gemini: ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.5-pro'],
+  openai: ['gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex'],
+  'opencode-zen': ['opencode/gpt-5.6-sol', 'opencode/claude-sonnet-5', 'opencode/gemini-3.7-flash']
+}
 const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Spanish', 'French']
 
 export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): React.JSX.Element {
@@ -14,6 +27,11 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
   const [activeTab, setActiveTab] = useState<'create' | 'sessions'>('create')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [creating, setCreating] = useState(false)
+
+  function handleProviderChange(provider: LlmProvider): void {
+    setField('provider', provider)
+    setField('model', PROVIDER_MODELS[provider][0])
+  }
 
   async function handleCreate(): Promise<void> {
     setCreating(true)
@@ -59,9 +77,7 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
       </div>
 
       {activeTab === 'sessions' ? (
-        <div className="flex flex-1 items-center justify-center text-sm text-neutral-400">
-          No call sessions yet.
-        </div>
+        <CallSessionsList />
       ) : (
         <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4">
           {/* Session Type */}
@@ -138,11 +154,22 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
             <FieldLabel>Output Settings</FieldLabel>
             <div className="flex flex-wrap gap-2">
               <select
+                value={form.provider}
+                onChange={(e) => handleProviderChange(e.target.value as LlmProvider)}
+                className="rounded-lg border border-black/10 bg-black/[0.02] px-3 py-1.5 text-sm text-neutral-700 outline-none"
+              >
+                {(Object.keys(PROVIDER_LABELS) as LlmProvider[]).map((p) => (
+                  <option key={p} value={p}>
+                    {PROVIDER_LABELS[p]}
+                  </option>
+                ))}
+              </select>
+              <select
                 value={form.model}
                 onChange={(e) => setField('model', e.target.value)}
                 className="rounded-lg border border-black/10 bg-black/[0.02] px-3 py-1.5 text-sm text-neutral-700 outline-none"
               >
-                {MODEL_OPTIONS.map((m) => (
+                {PROVIDER_MODELS[form.provider].map((m) => (
                   <option key={m} value={m}>
                     {m}
                   </option>
