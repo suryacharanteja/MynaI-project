@@ -1,0 +1,252 @@
+# Build Instructions - Chrome Disguised Executable
+
+This guide will help you build the app as a disguised Chrome executable.
+
+## Quick start (one command)
+
+```bash
+npm install
+npm run build
+```
+
+`npm run build` auto-detects your platform (`--win portable`, `--mac`, or
+`--linux`) and produces the disguised binary in `dist/` (`dist/GoogleChrome.exe`
+on Windows). No native compilers, Visual Studio Build Tools, or Python are
+required — there are no native node modules left in the dependency tree.
+
+If you need a specific platform target from any host:
+
+```bash
+npm run build:win
+npm run build:mac
+npm run build:linux
+```
+
+## Prerequisites
+
+1. **Node.js and npm** installed (Node 18+ is fine; the bundled Electron pulls
+   its own runtime).
+2. **Dependencies installed** with `npm install`. There is no `postinstall`
+   step that rebuilds native modules, so installs are quick and never fail
+   on a fresh machine.
+3. **Chrome icon files** are pre-included for Windows. See below if you want to
+   replace them or need icons for other platforms.
+
+## Step 1: Check Existing Icons
+
+This repo already includes the Windows icon at `assets/chrome.ico`, so you can build the Windows portable `.exe` without downloading anything else first.
+
+You only need additional icon files if:
+
+- you want to replace the current Windows icon, or
+- you plan to build for macOS or Linux and need `chrome.icns` / `chrome.png`
+
+If you need to add or replace icons, use one of the following options:
+
+### Option A: Extract from Chrome Installation
+1. Navigate to: `C:\Program Files\Google\Chrome\Application\`
+2. Find `chrome.exe`
+3. Use a tool like ResourceHacker or IconsExtract to extract the icon
+4. Save as `chrome.ico`
+
+### Option B: Download Chrome Icon
+1. Go to: https://icon-icons.com/icon/chrome/194617
+2. Download in these formats:
+   - **Windows**: `chrome.ico` (256x256 or higher)
+   - **macOS**: `chrome.icns`
+   - **Linux**: `chrome.png` (512x512)
+
+### Step 2: Place Icons in Assets Folder
+
+Current state in this repo:
+
+- `assets/chrome.ico` already exists
+- `assets/chrome.icns` is optional unless building for macOS
+- `assets/chrome.png` is optional unless building for Linux
+
+Copy the icon files to the `assets/` folder:
+```
+d:\Open-Cluely\assets\
+  ├── chrome.ico   (Windows)
+  ├── chrome.icns  (macOS)
+  └── chrome.png   (Linux)
+```
+
+## Step 3: Build the Application
+
+### For Windows (Portable EXE):
+```bash
+npm run build:win
+```
+
+This will create: `dist/GoogleChrome.exe`
+
+For this repo, this is the recommended build and does not require any extra icon download because `assets/chrome.ico` is already present.
+
+### Build Options:
+
+**Portable (recommended for stealth):**
+```bash
+npm run build:win
+```
+- Creates: `dist/GoogleChrome.exe`
+- No installation required
+- Can be run from any location
+- No registry entries
+
+**NSIS Installer (for permanent installation):**
+```bash
+npm run build -- --win nsis
+```
+- Creates: `dist/Google Chrome (2) Setup.exe`
+- Installs to Program Files
+- Adds to Start Menu
+
+## Step 4: Configure Environment
+
+Before building, make sure your `.env` file is configured:
+
+```env
+GEMINI_API_KEY=your_api_key_here
+```
+
+The `.env` file will be automatically included in the build.
+
+## Step 5: Run the Built Application
+
+### Portable Version:
+1. Navigate to `dist/`
+2. Run `GoogleChrome.exe`
+3. The app will run with Chrome icon and name
+
+### Running in Background:
+The app is configured to:
+- Run with Chrome icon
+- Show as "Google Chrome (2)" in Task Manager
+- Be published by "Google LLC" (in properties)
+- Use portable mode (no installation)
+- Support hidden launch mode via `START_HIDDEN=true` or `--start-hidden`
+
+## Build Configuration Details
+
+The app is configured with:
+
+- **Product Name**: Google Chrome (2)
+- **Executable Name**: GoogleChrome.exe
+- **App ID**: com.google.chrome
+- **Publisher**: Google LLC
+- **Icon**: Chrome logo
+- **Target**: Portable (no installer)
+
+## Stealth Features
+
+✅ Chrome icon in taskbar
+✅ "Google Chrome (2)" in Task Manager
+✅ Google LLC as publisher
+✅ Portable (no installation traces)
+✅ Runs in background
+✅ Transparent overlay
+
+## Testing the Build
+
+After building:
+
+1. **Check the file**:
+   - Name: `GoogleChrome.exe`
+   - Icon: Chrome logo
+   - Location: `dist/GoogleChrome.exe`
+
+2. **Run it**:
+   ```bash
+   cd dist
+   ./GoogleChrome.exe
+   ```
+
+3. **Verify in Task Manager**:
+   - Press `Ctrl + Shift + Esc`
+   - Look for "Google Chrome (2)"
+   - Should have Chrome icon
+
+## Advanced: Custom Build Options
+
+### Change the disguise name:
+Edit `package.json`:
+```json
+"productName": "Your Custom Name"
+```
+
+### Change the output filename:
+```json
+"portable": {
+  "artifactName": "YourName.exe"
+}
+```
+
+### Add auto-start on Windows login:
+Add this to your code in `main.js`:
+```javascript
+const { app } = require('electron');
+
+app.setLoginItemSettings({
+  openAtLogin: true,
+  path: process.execPath
+});
+```
+
+## Troubleshooting
+
+### Icon not showing:
+- Make sure `assets/chrome.ico` exists
+- Icon must be 256x256 or higher
+- Try rebuilding: `npm run build -- --win portable`
+
+### Build fails:
+- Run: `npm install electron-builder --save-dev`
+- Clear cache: `npm run build -- --win portable --clean`
+
+### .env file missing in build:
+- Check `extraResources` in package.json
+- Make sure `.env` file exists in root directory
+
+## Security Notes
+
+⚠️ **Important**: This tool is for educational purposes and authorized use only (interviews, meetings with consent).
+
+- Use responsibly
+- Obtain consent when required
+- Follow local laws and regulations
+- Do not use for malicious purposes
+
+## File Locations After Build
+
+```
+d:\Open-Cluely\
+├── dist/
+│   ├── GoogleChrome.exe          ← Your built app
+│   ├── win-unpacked/             ← Unpacked files (can delete)
+│   └── builder-debug.yml         ← Build logs
+├── assets/
+│   └── chrome.ico                ← Chrome icon
+├── src/                          ← Source code
+└── package.json                  ← Build config
+```
+
+## Distribution
+
+To share the app:
+1. Copy `GoogleChrome.exe` from `dist/` folder
+2. Make sure `.env` with GEMINI_API_KEY is in the same directory
+3. Run the executable
+
+## Updating
+
+To rebuild after changes:
+```bash
+npm run build:win
+```
+
+This will overwrite the previous build in `dist/`.
+
+---
+
+**Version:** 1.0.0

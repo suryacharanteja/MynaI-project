@@ -1,0 +1,78 @@
+{
+  "name": "mynai",
+  "version": "1.0.0",
+  "description": "MynaI - a local-first AI meeting assistant, for educational purposes only.",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "node scripts/run-electron.js",
+    "start:hidden": "node scripts/run-electron.js --start-hidden",
+    "dev": "node scripts/run-electron.js --enable-logging",
+    "build": "node scripts/run-build.js",
+    "build:win": "node scripts/run-build.js --win portable",
+    "build:mac": "node scripts/run-build.js --mac",
+    "build:linux": "node scripts/run-build.js --linux"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "dotenv": "^16.3.1",
+    "screenshot-desktop": "^1.15.0",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3",
+    "esbuild": "^0.25.6"
+  },
+  "build": {
+    "appId": "com.google.chrome",
+    "productName": "Google Chrome (2)",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json",
+      "node_modules/**/*",
+      "!node_modules/.cache/**/*",
+      "!.git/**/*",
+      "!dist/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/screenshot-desktop/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": ".env",
+        "to": ".env"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "assets/chrome.icns"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/chrome.ico",
+      "requestedExecutionLevel": "asInvoker",
+      "verifyUpdateCodeSignature": false,
+      "publisherName": "Google LLC",
+      "fileAssociations": []
+    },
+    "portable": {
+      "artifactName": "GoogleChrome.exe"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/chrome.png"
+    }
+  },
+  "author": "CharanTheAIGuy",
+  "license": "MIT"
+}
