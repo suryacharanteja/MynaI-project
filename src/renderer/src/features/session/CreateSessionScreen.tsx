@@ -139,7 +139,7 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
     <div className="relative flex h-full w-full flex-col overflow-hidden rounded-2xl border border-black/10 bg-white/95 text-neutral-900 shadow-2xl backdrop-blur-xl">
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
 
-      <TitleBar>
+      <TitleBar onMinimize={() => window.mynai.windowMinimize()} onClose={() => window.mynai.windowClose()}>
         <button
           onClick={() => setSettingsOpen(true)}
           className="rounded-full p-1.5 text-neutral-500 transition hover:bg-black/5 hover:text-neutral-900"

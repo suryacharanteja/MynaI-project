@@ -24,7 +24,11 @@ const api: MynaiApi = {
   onSttStatus: (callback: (event: SttStatusEvent) => void) => subscribe(IPC_CHANNELS.sttStatus, callback),
   onSttPartial: (callback: (event: SttTranscriptEvent) => void) => subscribe(IPC_CHANNELS.sttPartial, callback),
   onSttFinal: (callback: (event: SttTranscriptEvent) => void) => subscribe(IPC_CHANNELS.sttFinal, callback),
-  onSttError: (callback: (event: SttErrorEvent) => void) => subscribe(IPC_CHANNELS.sttError, callback)
+  onSttError: (callback: (event: SttErrorEvent) => void) => subscribe(IPC_CHANNELS.sttError, callback),
+
+  windowMinimize: () => ipcRenderer.send(IPC_CHANNELS.windowMinimize),
+  windowRestore: () => ipcRenderer.send(IPC_CHANNELS.windowRestore),
+  windowClose: () => ipcRenderer.send(IPC_CHANNELS.windowClose)
 }
 
 contextBridge.exposeInMainWorld('mynai', api)

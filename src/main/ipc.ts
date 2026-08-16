@@ -1,4 +1,4 @@
-import { desktopCapturer, ipcMain, type BrowserWindow, type IpcMainEvent } from 'electron'
+import { app, desktopCapturer, ipcMain, screen, type BrowserWindow, type IpcMainEvent, type Rectangle } from 'electron'
 import {
   IPC_CHANNELS,
   type AppSettings,
@@ -42,7 +42,38 @@ function apiKeyForProvider(settings: AppSettings, provider: AskAiRequest['provid
   }
 }
 
+const MINI_SIZE = 64
+const MINI_MARGIN = 16
+
 export function registerIpcHandlers(window: BrowserWindow): void {
+  const originalMinimumSize = window.getMinimumSize()
+  let previousBounds: Rectangle | null = null
+
+  ipcMain.on(IPC_CHANNELS.windowMinimize, () => {
+    if (window.isDestroyed()) return
+    previousBounds = window.getBounds()
+    const display = screen.getDisplayMatching(previousBounds)
+    const x = display.workArea.x + display.workArea.width - MINI_SIZE - MINI_MARGIN
+    const y = display.workArea.y + MINI_MARGIN
+    window.setMinimumSize(MINI_SIZE, MINI_SIZE)
+    window.setBounds({ x, y, width: MINI_SIZE, height: MINI_SIZE })
+  })
+
+  ipcMain.on(IPC_CHANNELS.windowRestore, () => {
+    if (window.isDestroyed()) return
+    window.setMinimumSize(originalMinimumSize[0], originalMinimumSize[1])
+    if (previousBounds) {
+      window.setBounds(previousBounds)
+      previousBounds = null
+    } else {
+      window.setSize(420, 640)
+    }
+  })
+
+  ipcMain.on(IPC_CHANNELS.windowClose, () => {
+    app.quit()
+  })
+
   ipcMain.handle(IPC_CHANNELS.getSettings, () => readSettings())
 
   ipcMain.handle(IPC_CHANNELS.setSettings, (_event, patch: Partial<AppSettings>) => {

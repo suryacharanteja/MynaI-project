@@ -16,7 +16,10 @@ export const IPC_CHANNELS = {
   sttStatus: 'stt:status',
   sttPartial: 'stt:partial',
   sttFinal: 'stt:final',
-  sttError: 'stt:error'
+  sttError: 'stt:error',
+  windowMinimize: 'window:minimize',
+  windowRestore: 'window:restore',
+  windowClose: 'window:close'
 } as const
 
 export interface AppSettings {
@@ -95,4 +98,8 @@ export interface MynaiApi {
   onSttPartial: (callback: (event: SttTranscriptEvent) => void) => () => void
   onSttFinal: (callback: (event: SttTranscriptEvent) => void) => () => void
   onSttError: (callback: (event: SttErrorEvent) => void) => () => void
+
+  windowMinimize: () => void
+  windowRestore: () => void
+  windowClose: () => void
 }

@@ -1,13 +1,19 @@
 import { useEffect, useRef } from 'react'
-import { Mic, MicOff, Radio, Sparkles } from 'lucide-react'
+import { Home, Mic, MicOff, Minus, Radio, Sparkles, X } from 'lucide-react'
 import { useOverlayStore } from '../../stores/overlay-store'
 
 export function TranscriptStrip({
   micOn,
-  onToggleMic
+  onToggleMic,
+  onHome,
+  onMinimize,
+  onClose
 }: {
   micOn: boolean
   onToggleMic: () => void
+  onHome: () => void
+  onMinimize: () => void
+  onClose: () => void
 }): React.JSX.Element {
   const transcript = useOverlayStore((s) => s.transcript)
   const partialText = useOverlayStore((s) => s.partialText)
@@ -76,6 +82,33 @@ export function TranscriptStrip({
       >
         {micOn ? <Mic size={14} /> : <MicOff size={14} />}
       </button>
+
+      <div
+        className="flex shrink-0 items-center gap-0.5 border-l border-white/10 pl-2"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      >
+        <button
+          onClick={onHome}
+          title="Back to home"
+          className="rounded-full p-1.5 text-neutral-400 transition hover:bg-white/10 hover:text-white"
+        >
+          <Home size={14} />
+        </button>
+        <button
+          onClick={onMinimize}
+          title="Minimize to bubble"
+          className="rounded-full p-1.5 text-neutral-400 transition hover:bg-white/10 hover:text-white"
+        >
+          <Minus size={14} />
+        </button>
+        <button
+          onClick={onClose}
+          title="Close MynaI"
+          className="rounded-full p-1.5 text-neutral-400 transition hover:bg-red-500/20 hover:text-red-400"
+        >
+          <X size={14} />
+        </button>
+      </div>
     </div>
   )
 }

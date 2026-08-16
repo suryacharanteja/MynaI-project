@@ -2,12 +2,32 @@ import { useState } from 'react'
 import { Toaster } from 'sonner'
 import { CreateSessionScreen } from './features/session/CreateSessionScreen'
 import { OverlayHUD } from './features/overlay/OverlayHUD'
+import { MinimizedBubble } from './components/ui/minimized-bubble'
 
 export default function App(): React.JSX.Element {
   const [screen, setScreen] = useState<'session' | 'overlay'>('session')
+  const [minimized, setMinimized] = useState(false)
+
+  function handleMinimize(): void {
+    window.mynai.windowMinimize()
+    setMinimized(true)
+  }
+
+  function handleRestore(): void {
+    window.mynai.windowRestore()
+    setMinimized(false)
+  }
+
+  function handleClose(): void {
+    window.mynai.windowClose()
+  }
+
+  function handleHome(): void {
+    setScreen('session')
+  }
 
   return (
-    <div className="h-screen bg-transparent p-2">
+    <div className={`h-screen bg-transparent ${minimized ? '' : 'p-2'}`}>
       <Toaster
         position="top-right"
         toastOptions={{
@@ -18,10 +38,19 @@ export default function App(): React.JSX.Element {
           }
         }}
       />
-      {screen === 'session' ? (
-        <CreateSessionScreen onCreate={() => setScreen('overlay')} />
-      ) : (
-        <OverlayHUD />
+
+      {/* Overlay HUD keeps running (audio/transcription) underneath the bubble while minimized. */}
+      {screen === 'overlay' && (
+        <div style={{ display: minimized ? 'none' : 'block', height: '100%' }}>
+          <OverlayHUD onHome={handleHome} onMinimize={handleMinimize} onClose={handleClose} />
+        </div>
+      )}
+      {screen === 'session' && !minimized && <CreateSessionScreen onCreate={() => setScreen('overlay')} />}
+
+      {minimized && (
+        <div className="flex h-full w-full items-center justify-center">
+          <MinimizedBubble onRestore={handleRestore} />
+        </div>
       )}
     </div>
   )
