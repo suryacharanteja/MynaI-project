@@ -5,8 +5,8 @@ import { safeSend } from '../../utils/safe-send'
 
 const SAMPLE_RATE = 16000
 const WATCHDOG_INTERVAL_MS = 1000
-const STALE_WARNING_MS = 15000
-const STALE_RECONNECT_MS = 30000
+const PING_INTERVAL_MS = 10000
+const PONG_TIMEOUT_MS = 25000
 const MAX_CONNECT_RETRIES = 5
 const BASE_RETRY_DELAY_MS = 1000
 const MAX_RETRY_DELAY_MS = 16000
@@ -50,10 +50,12 @@ interface SourceState {
   streaming: boolean
   closingIntentionally: boolean
   lastMessageAt: number
+  lastPongAt: number
   apiKey: string
   retryCount: number
   retryTimer: ReturnType<typeof setTimeout> | null
   hostIndex: number
+  pingTimer: ReturnType<typeof setInterval> | null
 }
 
 function createSourceState(): SourceState {
@@ -62,10 +64,12 @@ function createSourceState(): SourceState {
     streaming: false,
     closingIntentionally: false,
     lastMessageAt: 0,
+    lastPongAt: 0,
     apiKey: '',
     retryCount: 0,
     retryTimer: null,
-    hostIndex: 0
+    hostIndex: 0,
+    pingTimer: null
   }
 }
 
@@ -81,8 +85,17 @@ export function createAssemblyAiSttService(webContents: WebContents) {
     safeSend(webContents, channel, payload)
   }
 
+  function clearPingTimer(source: SttSource): void {
+    const timer = state[source].pingTimer
+    if (timer) {
+      clearInterval(timer)
+      state[source].pingTimer = null
+    }
+  }
+
   function terminateQuietly(source: SttSource): void {
     const ws = state[source].ws
+    clearPingTimer(source)
     if (!ws) return
     state[source].closingIntentionally = true
     try {
@@ -101,20 +114,27 @@ export function createAssemblyAiSttService(webContents: WebContents) {
     }
   }
 
+  /**
+   * Liveness is judged by WebSocket ping/pong, NOT by whether AssemblyAI has
+   * sent a transcript recently. Silence is normal during a call — nobody
+   * talking for 15-30s produces zero "Turn" messages from a perfectly healthy
+   * socket, since the server only emits messages when there's speech to
+   * transcribe. Judging staleness by content arrival was firing false
+   * "Connection may be stale" warnings during ordinary pauses. Ping/pong
+   * probes the transport itself, independent of speech activity.
+   */
   function startWatchdog(): void {
     if (watchdogTimer) return
     watchdogTimer = setInterval(() => {
       for (const source of ['mic', 'system'] as SttSource[]) {
         const s = state[source]
         if (!s.streaming || !s.ws) continue
-        const elapsed = Date.now() - s.lastMessageAt
-        if (elapsed >= STALE_RECONNECT_MS) {
+        const elapsedSincePong = Date.now() - s.lastPongAt
+        if (elapsedSincePong >= PONG_TIMEOUT_MS) {
           send('stt:error', { source, error: 'Connection lost. Reconnecting...' })
           terminateQuietly(source)
           s.streaming = false
           connect(source, s.apiKey)
-        } else if (elapsed >= STALE_WARNING_MS) {
-          send('stt:error', { source, error: 'Connection may be stale. Waiting for data...' })
         }
       }
     }, WATCHDOG_INTERVAL_MS)
@@ -183,8 +203,24 @@ export function createAssemblyAiSttService(webContents: WebContents) {
       s.streaming = true
       s.retryCount = 0
       s.lastMessageAt = Date.now()
+      s.lastPongAt = Date.now()
       send('stt:status', { source, status: 'connecting' })
       startWatchdog()
+
+      clearPingTimer(source)
+      s.pingTimer = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          try {
+            ws.ping()
+          } catch {
+            // no-op — watchdog will catch a genuinely dead socket via pong timeout
+          }
+        }
+      }, PING_INTERVAL_MS)
+    })
+
+    ws.on('pong', () => {
+      s.lastPongAt = Date.now()
     })
 
     ws.on('message', (raw: Buffer) => {
@@ -265,6 +301,7 @@ export function createAssemblyAiSttService(webContents: WebContents) {
   }
 
   function resetSource(source: SttSource): void {
+    clearPingTimer(source)
     state[source].ws = null
     state[source].streaming = false
     stopWatchdog()
