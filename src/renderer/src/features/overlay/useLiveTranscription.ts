@@ -5,16 +5,17 @@ import { useSessionStore } from '../../stores/session-store'
 import { isLikelyQuestion, isDuplicateQuestion } from './question-detector'
 import { askAiAndAddCard } from './ask-ai'
 
-const AUTO_ANSWER_COOLDOWN_MS = 8000
+const AUTO_ANSWER_COOLDOWN_MS = 3000
 const QUESTION_DETECTED_PULSE_MS = 2500
-const RECENT_QUESTIONS_LIMIT = 10
+const RECENT_QUESTIONS_LIMIT = 20
+const RECENT_TURNS_WINDOW = 5
+const RECENT_TURNS_MAX_AGE_MS = 15000
 
-/**
- * Owns the real mic/system-audio capture + AssemblyAI transcription lifecycle for
- * the overlay. Starts system-audio listening automatically (matching the reference
- * app's default), mic capture is opt-in via toggleMic to avoid surprising the user.
- * Also runs tier-1 auto-answer detection on finalized system-audio utterances.
- */
+interface RecentTurn {
+  text: string
+  timestamp: number
+}
+
 export function useLiveTranscription() {
   const addTranscriptMessage = useOverlayStore((s) => s.addTranscriptMessage)
   const setPartialText = useOverlayStore((s) => s.setPartialText)
@@ -25,10 +26,14 @@ export function useLiveTranscription() {
   const captureRef = useRef(createAudioCapture())
   const lastAutoAnswerAtRef = useRef(0)
   const recentQuestionsRef = useRef<string[]>([])
+  const recentTurnsRef = useRef<RecentTurn[]>([])
 
   useEffect(() => {
     const capture = captureRef.current
-    const unsubStatus = window.mynai.onSttStatus((e) => setSttStatus(e.source, e.status))
+    const unsubStatus = window.mynai.onSttStatus((e) => {
+      setSttStatus(e.source, e.status)
+      if (e.status === 'listening') setError(null)
+    })
     const unsubPartial = window.mynai.onSttPartial((e) => setPartialText(e.source, e.text))
     const unsubFinal = window.mynai.onSttFinal((e) => {
       setPartialText(e.source, '')
@@ -40,25 +45,58 @@ export function useLiveTranscription() {
         timestamp: Date.now()
       })
 
-      // Tier 1 auto-answer: only ever runs on the "them" (system) channel.
-      if (e.source !== 'system') return
-      if (!isLikelyQuestion(e.text)) return
+      console.log('[auto-answer] stt:final', { source: e.source, text: e.text.slice(0, 80) })
+
+      const now = Date.now()
+
+      // Accumulate recent turns so question detection sees a sliding window of
+      // recent speech, not just the current fragment. This handles the case where
+      // AssemblyAI splits "What are the best practices for protecting data?" across
+      // multiple turn boundaries — the individual fragments might not look like
+      // questions, but the combined recent text does.
+      recentTurnsRef.current = [
+        ...recentTurnsRef.current.filter((t) => now - t.timestamp < RECENT_TURNS_MAX_AGE_MS),
+        { text: e.text, timestamp: now }
+      ].slice(-RECENT_TURNS_WINDOW)
+
+      const combinedRecentText = recentTurnsRef.current.map((t) => t.text).join(' ')
+
+      const individualMatch = isLikelyQuestion(e.text)
+      const combinedMatch = !individualMatch && isLikelyQuestion(combinedRecentText)
+
+      console.log('[auto-answer] question check', { individualMatch, combinedMatch, text: e.text.slice(0, 60), combined: combinedRecentText.slice(0, 80) })
+
+      if (!individualMatch && !combinedMatch) return
+
+      const questionText = individualMatch ? e.text : combinedRecentText
 
       setQuestionDetected(true)
       setTimeout(() => setQuestionDetected(false), QUESTION_DETECTED_PULSE_MS)
 
       const { autoAnswerOn } = useOverlayStore.getState()
-      if (!autoAnswerOn) return
+      if (!autoAnswerOn) {
+        console.log('[auto-answer] skipped — autoAnswerOn is OFF')
+        return
+      }
 
-      const now = Date.now()
-      if (now - lastAutoAnswerAtRef.current < AUTO_ANSWER_COOLDOWN_MS) return
-      if (isDuplicateQuestion(e.text, recentQuestionsRef.current)) return
+      if (now - lastAutoAnswerAtRef.current < AUTO_ANSWER_COOLDOWN_MS) {
+        console.log('[auto-answer] skipped — cooldown active')
+        return
+      }
+      if (isDuplicateQuestion(questionText, recentQuestionsRef.current)) {
+        console.log('[auto-answer] skipped — duplicate question')
+        return
+      }
 
+      console.log('[auto-answer] TRIGGERING askAiAndAddCard:', questionText.slice(0, 80))
       lastAutoAnswerAtRef.current = now
-      recentQuestionsRef.current = [...recentQuestionsRef.current, e.text].slice(-RECENT_QUESTIONS_LIMIT)
+      recentQuestionsRef.current = [...recentQuestionsRef.current, questionText].slice(-RECENT_QUESTIONS_LIMIT)
+      // Clear the recent turns buffer after triggering so the same accumulated
+      // text doesn't re-trigger on the next turn
+      recentTurnsRef.current = []
 
       const { form } = useSessionStore.getState()
-      askAiAndAddCard(e.text, form)
+      askAiAndAddCard(questionText, form)
     })
     const unsubError = window.mynai.onSttError((e) => setError(e.error))
 

@@ -9,10 +9,17 @@ const INTERROGATIVE_STARTERS = [
   'can you',
   'could you',
   'would you',
+  'do you',
+  'did you',
+  'have you',
+  'are you',
+  'is there',
   'tell me',
   'walk me through',
   'describe',
-  'explain'
+  'explain',
+  'give me',
+  'show me'
 ]
 
 const IMPERATIVE_TASK_VERBS = [
@@ -25,30 +32,31 @@ const IMPERATIVE_TASK_VERBS = [
   'optimize',
   'debug',
   'code',
-  'create'
+  'create',
+  'define',
+  'compare',
+  'list',
+  'name'
 ]
 
-const MIN_WORDS_FOR_LONG_UTTERANCE = 8
+const MIN_WORDS_FOR_QUESTION = 3
+const MIN_WORDS_FOR_LONG_UTTERANCE = 6
 
-/**
- * Tier 1 (build plan 6a) — free, instant heuristics run only on the "them" (system)
- * channel against a finalized utterance. Deliberately loose: false positives cost a
- * wasted LLM call, false negatives cost the user having to hit Ask AI manually —
- * Tier 2 (a nano-model classifier reassembling fragmented transcripts) is not built
- * yet, so this is the whole detector for now.
- */
 export function isLikelyQuestion(text: string): boolean {
   const trimmed = text.trim()
   if (trimmed.length === 0) return false
 
-  if (trimmed.endsWith('?')) return true
+  const wordCount = trimmed.split(/\s+/).filter(Boolean).length
+
+  // A "?" anywhere in the text is a strong signal — but require at least 3 words
+  // to avoid false positives on fragments like "?" or "huh?"
+  if (trimmed.includes('?') && wordCount >= MIN_WORDS_FOR_QUESTION) return true
 
   const lower = trimmed.toLowerCase()
   if (INTERROGATIVE_STARTERS.some((starter) => lower.startsWith(starter))) return true
   if (IMPERATIVE_TASK_VERBS.some((verb) => lower.startsWith(verb))) return true
 
-  const wordCount = trimmed.split(/\s+/).filter(Boolean).length
-  if (wordCount >= MIN_WORDS_FOR_LONG_UTTERANCE && /\b(what|how|why|explain|describe)\b/.test(lower)) {
+  if (wordCount >= MIN_WORDS_FOR_LONG_UTTERANCE && /\b(what|how|why|explain|describe|difference|between|compare)\b/.test(lower)) {
     return true
   }
 
@@ -59,8 +67,6 @@ function normalizeForDedupe(text: string): string {
   return text.trim().toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ')
 }
 
-/** Tier 3 (build plan 6a) simplified — exact/near-exact match against recently
- * answered questions, since we don't have embeddings wired up for cosine similarity. */
 export function isDuplicateQuestion(candidate: string, recent: string[]): boolean {
   const normalizedCandidate = normalizeForDedupe(candidate)
   return recent.some((q) => {
@@ -68,6 +74,6 @@ export function isDuplicateQuestion(candidate: string, recent: string[]): boolea
     if (normalizedCandidate === normalizedRecent) return true
     const shorter = Math.min(normalizedCandidate.length, normalizedRecent.length)
     const longer = Math.max(normalizedCandidate.length, normalizedRecent.length)
-    return shorter > 12 && longer > 0 && shorter / longer > 0.85 && normalizedRecent.includes(normalizedCandidate.slice(0, shorter))
+    return shorter > 20 && longer > 0 && shorter / longer > 0.8 && normalizedRecent.includes(normalizedCandidate.slice(0, shorter))
   })
 }

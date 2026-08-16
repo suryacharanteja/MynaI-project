@@ -11,18 +11,34 @@ function normalizeSource(source: string): SttSource {
 interface SourceState {
   ws: WebSocket | null
   streaming: boolean
+  /** Set just before we force-close a socket ourselves (stop(), or replacing a
+   * stale one in start()) so the resulting 'error'/'close' isn't mistaken for a
+   * real connection failure and surfaced to the user. */
+  closingIntentionally: boolean
 }
 
 export function createAssemblyAiSttService(webContents: WebContents) {
   const state: Record<SttSource, SourceState> = {
-    mic: { ws: null, streaming: false },
-    system: { ws: null, streaming: false }
+    mic: { ws: null, streaming: false, closingIntentionally: false },
+    system: { ws: null, streaming: false, closingIntentionally: false }
   }
 
   function send(channel: string, payload: unknown): void {
     if (!webContents.isDestroyed()) {
       webContents.send(channel, payload)
     }
+  }
+
+  function terminateQuietly(source: SttSource): void {
+    const ws = state[source].ws
+    if (!ws) return
+    state[source].closingIntentionally = true
+    try {
+      ws.terminate()
+    } catch {
+      // no-op
+    }
+    state[source].ws = null
   }
 
   function start(source: string, apiKey: string): { success: boolean; error?: string } {
@@ -39,14 +55,7 @@ export function createAssemblyAiSttService(webContents: WebContents) {
     // double-mount) must be force-closed before opening a new one — otherwise
     // both stay open, audio only reaches whichever is currently referenced, and
     // the other idles until AssemblyAI kills it with a keepalive-timeout close.
-    if (state[resolvedSource].ws) {
-      try {
-        state[resolvedSource].ws!.terminate()
-      } catch {
-        // no-op
-      }
-      state[resolvedSource].ws = null
-    }
+    terminateQuietly(resolvedSource)
 
     const query = new URLSearchParams({
       sample_rate: String(SAMPLE_RATE),
@@ -56,9 +65,9 @@ export function createAssemblyAiSttService(webContents: WebContents) {
       headers: { Authorization: apiKey }
     })
     state[resolvedSource].ws = ws
+    state[resolvedSource].closingIntentionally = false
 
     ws.on('open', () => {
-      console.log(`[stt:${resolvedSource}] ws open`)
       state[resolvedSource].streaming = true
       send('stt:status', { source: resolvedSource, status: 'connecting' })
     })
@@ -66,7 +75,6 @@ export function createAssemblyAiSttService(webContents: WebContents) {
     ws.on('message', (raw: Buffer) => {
       try {
         const msg = JSON.parse(raw.toString())
-        console.log(`[stt:${resolvedSource}] message`, msg.type, msg.transcript ?? '')
         switch (msg.type) {
           case 'Begin':
             send('stt:status', { source: resolvedSource, status: 'listening' })
@@ -84,22 +92,26 @@ export function createAssemblyAiSttService(webContents: WebContents) {
             send('stt:status', { source: resolvedSource, status: 'off' })
             break
         }
-      } catch (err) {
-        console.log(`[stt:${resolvedSource}] parse error`, err, raw.toString().slice(0, 200))
+      } catch {
+        // ignore malformed frames
       }
     })
 
     ws.on('error', (error: Error) => {
-      console.log(`[stt:${resolvedSource}] ws error`, error.message)
-      send('stt:error', { source: resolvedSource, error: error.message })
+      const intentional = state[resolvedSource].closingIntentionally
       resetSource(resolvedSource)
+      if (!intentional) {
+        send('stt:error', { source: resolvedSource, error: error.message })
+      }
     })
 
-    ws.on('close', (code: number, reason: Buffer) => {
-      console.log(`[stt:${resolvedSource}] ws close`, code, reason.toString())
+    ws.on('close', () => {
+      const wasIntentional = state[resolvedSource].closingIntentionally
       if (state[resolvedSource].streaming) {
         resetSource(resolvedSource)
-        send('stt:status', { source: resolvedSource, status: 'off' })
+        if (!wasIntentional) {
+          send('stt:status', { source: resolvedSource, status: 'off' })
+        }
       }
     })
 
@@ -114,23 +126,17 @@ export function createAssemblyAiSttService(webContents: WebContents) {
   function stop(source: string): void {
     const resolvedSource = normalizeSource(source)
     const ws = state[resolvedSource].ws
-    if (ws) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
       try {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'Terminate' }))
-        }
-      } catch {
-        // no-op
-      }
-      // Sending Terminate alone doesn't close the socket — AssemblyAI's own
-      // Termination reply would, but we're not waiting for it, so force-close now.
-      try {
-        ws.terminate()
+        ws.send(JSON.stringify({ type: 'Terminate' }))
       } catch {
         // no-op
       }
     }
-    resetSource(resolvedSource)
+    // Sending Terminate alone doesn't close the socket — AssemblyAI's own
+    // Termination reply would, but we're not waiting for it, so force-close now.
+    terminateQuietly(resolvedSource)
+    state[resolvedSource].streaming = false
   }
 
   function pushAudioChunk(source: string, data: ArrayBuffer): void {
