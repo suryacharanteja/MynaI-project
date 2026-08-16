@@ -17,10 +17,13 @@ interface ModelOption {
 // OpenAI list is best-effort from published docs — not verified against a live key yet.
 // OpenCode Go list verified against GET https://opencode.ai/zen/go/v1/models with a real key —
 // note: no "opencode/" prefix on the IDs, unlike the general Zen product's convention.
+// OpenCode Zen free-tier list verified against the public GET https://opencode.ai/zen/v1/models
+// (no auth required to list) — these 7 are $0/1M tokens per the Zen pricing page.
 const PROVIDER_LABELS: Record<LlmProvider, string> = {
   gemini: 'Gemini',
   openai: 'OpenAI',
-  'opencode-go': 'OpenCode Go'
+  'opencode-go': 'OpenCode Go',
+  'opencode-zen': 'OpenCode Zen (Free)'
 }
 const PROVIDER_MODELS: Record<LlmProvider, ModelOption[]> = {
   gemini: ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.5-pro'].map((m) => ({
@@ -55,6 +58,15 @@ const PROVIDER_MODELS: Record<LlmProvider, ModelOption[]> = {
     { value: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
     { value: 'hy3', label: 'Hy3' },
     { value: 'hy3-preview', label: 'Hy3 Preview' }
+  ],
+  'opencode-zen': [
+    { value: 'big-pickle', label: 'Big Pickle (Free)' },
+    { value: 'deepseek-v4-flash-free', label: 'DeepSeek V4 Flash (Free)' },
+    { value: 'mimo-v2.5-free', label: 'MiMo-V2.5 (Free)' },
+    { value: 'hy3-free', label: 'Hy3 (Free)' },
+    { value: 'laguna-s-2.1-free', label: 'Laguna S 2.1 (Free)' },
+    { value: 'nemotron-3-ultra-free', label: 'Nemotron 3 Ultra (Free)' },
+    { value: 'nemotron-3.5-lightning-free', label: 'Nemotron 3.5 Lightning (Free)' }
   ]
 }
 const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Spanish', 'French']

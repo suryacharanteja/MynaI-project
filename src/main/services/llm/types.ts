@@ -1,4 +1,4 @@
-export type LlmProvider = 'gemini' | 'openai' | 'opencode-go'
+export type LlmProvider = 'gemini' | 'openai' | 'opencode-go' | 'opencode-zen'
 
 export interface AskParams {
   apiKey: string

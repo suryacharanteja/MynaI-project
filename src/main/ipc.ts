@@ -16,7 +16,12 @@ import { askLlm } from './services/llm/router'
 import { createSession, listSessions } from './sessions/store'
 import { createAssemblyAiSttService } from './services/stt/assemblyai'
 
-const PROVIDER_LABELS = { gemini: 'Gemini', openai: 'OpenAI', 'opencode-go': 'OpenCode Go' } as const
+const PROVIDER_LABELS = {
+  gemini: 'Gemini',
+  openai: 'OpenAI',
+  'opencode-go': 'OpenCode Go',
+  'opencode-zen': 'OpenCode Zen'
+} as const
 
 function apiKeyForProvider(settings: AppSettings, provider: AskAiRequest['provider']): string | null {
   switch (provider) {
@@ -26,6 +31,8 @@ function apiKeyForProvider(settings: AppSettings, provider: AskAiRequest['provid
       return settings.openaiApiKey
     case 'opencode-go':
       return settings.openCodeGoApiKey
+    case 'opencode-zen':
+      return settings.openCodeZenApiKey
   }
 }
 

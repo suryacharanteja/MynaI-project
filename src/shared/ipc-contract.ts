@@ -24,13 +24,15 @@ export interface AppSettings {
   assemblyAiApiKey: string | null
   openaiApiKey: string | null
   openCodeGoApiKey: string | null
+  openCodeZenApiKey: string | null
 }
 
 export const defaultAppSettings: AppSettings = {
   geminiApiKey: null,
   assemblyAiApiKey: null,
   openaiApiKey: null,
-  openCodeGoApiKey: null
+  openCodeGoApiKey: null,
+  openCodeZenApiKey: null
 }
 
 export interface CreateSessionResult {
