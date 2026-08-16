@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Briefcase, Phone, FileText, User, Plus, Sparkles, MessageSquare, Settings } from 'lucide-react'
+import { toast } from 'sonner'
 import type { LlmProvider } from '@shared/session-types'
+import { createSessionFormSchema } from '@shared/schemas'
 import { useSessionStore } from '../../stores/session-store'
 import { FieldLabel, TextArea, TextInput } from '../../components/ui/field-shell'
 import { Toggle } from '../../components/ui/toggle'
@@ -13,12 +15,6 @@ interface ModelOption {
   label: string
 }
 
-// Gemini list verified against the live /v1beta/models endpoint with a real key.
-// OpenAI list is best-effort from published docs — not verified against a live key yet.
-// OpenCode Go list verified against GET https://opencode.ai/zen/go/v1/models with a real key —
-// note: no "opencode/" prefix on the IDs, unlike the general Zen product's convention.
-// OpenCode Zen free-tier list verified against the public GET https://opencode.ai/zen/v1/models
-// (no auth required to list) — these 7 are $0/1M tokens per the Zen pricing page.
 const PROVIDER_LABELS: Record<LlmProvider, string> = {
   gemini: 'Gemini',
   openai: 'OpenAI',
@@ -71,11 +67,42 @@ const PROVIDER_MODELS: Record<LlmProvider, ModelOption[]> = {
 }
 const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Spanish', 'French']
 
+const API_KEY_FOR_PROVIDER: Record<LlmProvider, string> = {
+  gemini: 'geminiApiKey',
+  openai: 'openaiApiKey',
+  'opencode-go': 'openCodeGoApiKey',
+  'opencode-zen': 'openCodeZenApiKey'
+}
+
+type FieldErrors = Record<string, string>
+
 export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): React.JSX.Element {
   const { form, setSessionType, setField } = useSessionStore()
   const [activeTab, setActiveTab] = useState<'create' | 'sessions'>('create')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [errors, setErrors] = useState<FieldErrors>({})
+  const [hasApiKey, setHasApiKey] = useState(true)
+
+  useEffect(() => {
+    window.mynai.getSettings().then((settings) => {
+      const key = settings[API_KEY_FOR_PROVIDER[form.provider] as keyof typeof settings]
+      setHasApiKey(!!key)
+    })
+  }, [form.provider])
+
+  function validate(): FieldErrors {
+    const result = createSessionFormSchema.safeParse(form)
+    if (result.success) return {}
+    const fieldErrors: FieldErrors = {}
+    for (const issue of result.error.issues) {
+      const path = issue.path.join('.')
+      if (!fieldErrors[path]) {
+        fieldErrors[path] = issue.message
+      }
+    }
+    return fieldErrors
+  }
 
   function handleProviderChange(provider: LlmProvider): void {
     setField('provider', provider)
@@ -83,10 +110,26 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
   }
 
   async function handleCreate(): Promise<void> {
+    const fieldErrors = validate()
+    setErrors(fieldErrors)
+    if (Object.keys(fieldErrors).length > 0) return
+
+    if (!hasApiKey) {
+      toast.error(`No ${PROVIDER_LABELS[form.provider]} API key configured. Open Settings to add one.`)
+      return
+    }
+
     setCreating(true)
     try {
-      await window.mynai.createSession(form)
+      const result = await window.mynai.createSession(form)
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      toast.success('Session created')
       onCreate?.()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create session')
     } finally {
       setCreating(false)
     }
@@ -167,19 +210,34 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
             <TextInput
               placeholder="Acme..."
               value={form.company}
-              onChange={(e) => setField('company', e.target.value)}
+              onChange={(e) => {
+                setField('company', e.target.value)
+                if (errors.company) setErrors((prev) => ({ ...prev, company: '' }))
+              }}
             />
+            {errors.company && <p className="mt-1 text-xs text-red-500">{errors.company}</p>}
           </div>
 
           {/* Job Description */}
           <div>
-            <FieldLabel icon={<FileText size={14} />}>Job Description</FieldLabel>
+            <div className="mb-1.5 flex items-center justify-between">
+              <FieldLabel icon={<FileText size={14} />}>Job Description</FieldLabel>
+              <span
+                className={`text-xs ${form.jobDescription.length > 2000 ? 'text-red-500' : 'text-neutral-400'}`}
+              >
+                {form.jobDescription.length}/2000
+              </span>
+            </div>
             <TextArea
               rows={4}
               placeholder="Software Engineer versed in Python, SQL, and AWS..."
               value={form.jobDescription}
-              onChange={(e) => setField('jobDescription', e.target.value)}
+              onChange={(e) => {
+                setField('jobDescription', e.target.value)
+                if (errors.jobDescription) setErrors((prev) => ({ ...prev, jobDescription: '' }))
+              }}
             />
+            {errors.jobDescription && <p className="mt-1 text-xs text-red-500">{errors.jobDescription}</p>}
           </div>
 
           {/* Context */}
@@ -239,6 +297,11 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
                 <MessageSquare size={14} /> Answer Preferences
               </button>
             </div>
+            {!hasApiKey && (
+              <p className="mt-2 text-xs text-amber-600">
+                No API key set for {PROVIDER_LABELS[form.provider]}. Add one in Settings before creating a session.
+              </p>
+            )}
           </div>
 
           {/* Behavior */}
@@ -268,7 +331,7 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
             disabled={creating}
             className="w-full rounded-lg bg-neutral-900 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-700 disabled:opacity-50"
           >
-            {creating ? 'Creating…' : 'Create Session'}
+            {creating ? 'Creating...' : 'Create Session'}
           </button>
         </div>
       )}

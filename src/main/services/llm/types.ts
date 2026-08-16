@@ -1,3 +1,6 @@
+import type { AnswerPreferences } from '../../../shared/session-types'
+import { answerResultSchema } from '../../../shared/schemas'
+
 export type LlmProvider = 'gemini' | 'openai' | 'opencode-go' | 'opencode-zen'
 
 export interface AskParams {
@@ -7,6 +10,7 @@ export interface AskParams {
   company?: string
   jobDescription?: string
   extraContext?: string
+  answerPreferences?: AnswerPreferences
 }
 
 export interface AnswerResult {
@@ -36,9 +40,21 @@ export function buildPrompt(params: AskParams): string {
     params.extraContext ? `Extra context: ${params.extraContext}` : null
   ].filter(Boolean)
 
+  const prefLines: string[] = []
+  if (params.answerPreferences) {
+    const p = params.answerPreferences
+    prefLines.push(`Response tone: ${p.tone}.`)
+    prefLines.push(`Response length: ${p.length}.`)
+    prefLines.push(`Target seniority level: ${p.seniority}.`)
+    if (p.codeLanguage) {
+      prefLines.push(`Preferred code language: ${p.codeLanguage}.`)
+    }
+  }
+
   return [
     'You are answering as the candidate, in first person, in an interview or meeting.',
     contextLines.length > 0 ? contextLines.join('\n') : null,
+    prefLines.length > 0 ? prefLines.join(' ') : null,
     `Question: ${params.question}`,
     RESPONSE_SCHEMA_INSTRUCTIONS
   ]
@@ -58,14 +74,23 @@ export function extractJson(text: string): string {
 }
 
 export function parseAnswerJson(question: string, text: string): AnswerResult {
-  const parsed = JSON.parse(extractJson(text))
-  return {
-    question,
-    answer: String(parsed.answer ?? ''),
-    keySteps: Array.isArray(parsed.keySteps) ? parsed.keySteps.map(String) : [],
-    code: parsed.code && typeof parsed.code === 'object' ? parsed.code : null,
-    explanation: String(parsed.explanation ?? ''),
-    timeComplexity: parsed.timeComplexity ?? null,
-    spaceComplexity: parsed.spaceComplexity ?? null
+  let raw: unknown
+  try {
+    raw = JSON.parse(extractJson(text))
+  } catch {
+    return {
+      question,
+      answer: text,
+      keySteps: [],
+      code: null,
+      explanation: '',
+      timeComplexity: null,
+      spaceComplexity: null
+    }
   }
+
+  const parsed = answerResultSchema.safeParse(raw)
+  const data = parsed.success ? parsed.data : answerResultSchema.parse({})
+
+  return { question, ...data }
 }

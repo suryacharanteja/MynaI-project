@@ -5,16 +5,22 @@ import {
   type AskAiError,
   type AskAiRequest,
   type AskAiResult,
+  type CreateSessionError,
   type CreateSessionResult,
   type SessionSummary,
   type SttStartResult
 } from '../shared/ipc-contract'
 import type { DesktopSource } from '../shared/stt-types'
-import type { CreateSessionForm } from '../shared/session-types'
 import { readSettings, writeSettings } from './store'
 import { askLlm } from './services/llm/router'
 import { createSession, listSessions } from './sessions/store'
 import { createAssemblyAiSttService } from './services/stt/assemblyai'
+import {
+  appSettingsSchema,
+  askAiRequestSchema,
+  createSessionFormSchema,
+  sttSourceSchema
+} from '../shared/schemas'
 
 const PROVIDER_LABELS = {
   gemini: 'Gemini',
@@ -40,34 +46,53 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle(IPC_CHANNELS.getSettings, () => readSettings())
 
   ipcMain.handle(IPC_CHANNELS.setSettings, (_event, patch: Partial<AppSettings>) => {
-    const next = { ...readSettings(), ...patch }
+    const parsed = appSettingsSchema.partial().safeParse(patch)
+    if (!parsed.success) {
+      return readSettings()
+    }
+    const next = { ...readSettings(), ...parsed.data }
     writeSettings(next)
     return next
   })
 
-  ipcMain.handle(IPC_CHANNELS.createSession, (_event, form: CreateSessionForm): CreateSessionResult => {
-    const session = createSession(form)
-    return { ok: true, sessionId: session.id }
-  })
+  ipcMain.handle(
+    IPC_CHANNELS.createSession,
+    (_event, form: unknown): CreateSessionResult | CreateSessionError => {
+      const parsed = createSessionFormSchema.safeParse(form)
+      if (!parsed.success) {
+        const firstIssue = parsed.error.issues[0]
+        return { ok: false, error: firstIssue?.message ?? 'Invalid session form' }
+      }
+      const session = createSession(parsed.data)
+      return { ok: true, sessionId: session.id }
+    }
+  )
 
   ipcMain.handle(IPC_CHANNELS.listSessions, (): SessionSummary[] => listSessions())
 
   ipcMain.handle(
     IPC_CHANNELS.askAi,
-    async (_event, request: AskAiRequest): Promise<AskAiResult | AskAiError> => {
+    async (_event, request: unknown): Promise<AskAiResult | AskAiError> => {
+      const parsed = askAiRequestSchema.safeParse(request)
+      if (!parsed.success) {
+        const firstIssue = parsed.error.issues[0]
+        return { error: firstIssue?.message ?? 'Invalid request' }
+      }
+      const req = parsed.data
       const settings = readSettings()
-      const apiKey = apiKeyForProvider(settings, request.provider)
+      const apiKey = apiKeyForProvider(settings, req.provider)
       if (!apiKey) {
-        return { error: `No ${PROVIDER_LABELS[request.provider]} API key configured. Open Settings and add one.` }
+        return { error: `No ${PROVIDER_LABELS[req.provider]} API key configured. Open Settings and add one.` }
       }
       try {
-        return await askLlm(request.provider, {
+        return await askLlm(req.provider, {
           apiKey,
-          model: request.model,
-          question: request.question,
-          company: request.company,
-          jobDescription: request.jobDescription,
-          extraContext: request.extraContext
+          model: req.model,
+          question: req.question,
+          company: req.company,
+          jobDescription: req.jobDescription,
+          extraContext: req.extraContext,
+          answerPreferences: req.answerPreferences
         })
       } catch (error) {
         return { error: error instanceof Error ? error.message : 'Ask AI failed.' }
@@ -83,19 +108,29 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     return sources.map((s) => ({ id: s.id, name: s.name }))
   })
 
-  ipcMain.handle(IPC_CHANNELS.sttStart, (_event, source: string): SttStartResult => {
+  ipcMain.handle(IPC_CHANNELS.sttStart, (_event, source: unknown): SttStartResult => {
+    const parsed = sttSourceSchema.safeParse(source)
+    if (!parsed.success) {
+      return { success: false, error: 'Invalid audio source. Must be "mic" or "system".' }
+    }
     const settings = readSettings()
     if (!settings.assemblyAiApiKey) {
       return { success: false, error: 'AssemblyAI API key not configured. Add it in Settings.' }
     }
-    return stt.start(source, settings.assemblyAiApiKey)
+    return stt.start(parsed.data, settings.assemblyAiApiKey)
   })
 
-  ipcMain.handle(IPC_CHANNELS.sttStop, (_event, source: string) => {
-    stt.stop(source)
+  ipcMain.handle(IPC_CHANNELS.sttStop, (_event, source: unknown) => {
+    const parsed = sttSourceSchema.safeParse(source)
+    if (parsed.success) {
+      stt.stop(parsed.data)
+    }
   })
 
   ipcMain.on(IPC_CHANNELS.sttAudioChunk, (_event: IpcMainEvent, { source, data }: { source: string; data: ArrayBuffer }) => {
-    stt.pushAudioChunk(source, data)
+    const parsed = sttSourceSchema.safeParse(source)
+    if (parsed.success) {
+      stt.pushAudioChunk(parsed.data, data)
+    }
   })
 }

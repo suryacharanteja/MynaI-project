@@ -1,7 +1,42 @@
 {
-  "name": "parakeetai-desktop",
-  "version": "3.9.26",
-  "description": "ParakeetAI Desktop App",
-  "author": "ParakeetAI",
-  "main": "./dist/main/main.js"
+  "name": "mynai",
+  "version": "1.0.0",
+  "description": "MynaI – AI-powered interview & meeting copilot",
+  "author": "CharanTheAIGuy",
+  "license": "MIT",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "clsx": "^2.1.1",
+    "dotenv": "^16.3.1",
+    "lucide-react": "^1.31.0",
+    "screenshot-desktop": "^1.15.0",
+    "sonner": "^2.0.8",
+    "ws": "^8.19.0",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@electron-toolkit/tsconfig": "^2.0.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^4.7.0",
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3",
+    "electron-vite": "^5.0.0",
+    "esbuild": "^0.25.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.6"
+  }
 }

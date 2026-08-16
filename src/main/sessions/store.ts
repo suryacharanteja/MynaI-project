@@ -3,12 +3,8 @@ import { randomUUID } from 'crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import type { CreateSessionForm } from '../../shared/session-types'
+import { sessionMetadataSchema } from '../../shared/schemas'
 
-/**
- * One directory per session under userData/sessions/<id>/metadata.json.
- * Same shape as the zero CLI's session store (metadata.json + per-session dir) —
- * simple, inspectable on disk, no DB dependency for this small a dataset.
- */
 export interface SessionMetadata {
   id: string
   form: CreateSessionForm
@@ -51,7 +47,11 @@ export function listSessions(): SessionMetadata[] {
     const file = metadataPath(entry.name)
     if (!existsSync(file)) continue
     try {
-      sessions.push(JSON.parse(readFileSync(file, 'utf-8')))
+      const raw = JSON.parse(readFileSync(file, 'utf-8'))
+      const parsed = sessionMetadataSchema.safeParse(raw)
+      if (parsed.success) {
+        sessions.push(parsed.data as SessionMetadata)
+      }
     } catch {
       // skip corrupt/partial session directories
     }
@@ -64,7 +64,9 @@ export function getSession(id: string): SessionMetadata | null {
   const file = metadataPath(id)
   if (!existsSync(file)) return null
   try {
-    return JSON.parse(readFileSync(file, 'utf-8'))
+    const raw = JSON.parse(readFileSync(file, 'utf-8'))
+    const parsed = sessionMetadataSchema.safeParse(raw)
+    return parsed.success ? (parsed.data as SessionMetadata) : null
   } catch {
     return null
   }

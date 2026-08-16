@@ -1,4 +1,4 @@
-import type { CreateSessionForm, LlmProvider } from './session-types'
+import type { AnswerPreferences, CreateSessionForm, LlmProvider } from './session-types'
 import type { DesktopSource, SttErrorEvent, SttStatusEvent, SttTranscriptEvent } from './stt-types'
 
 export type { LlmProvider } from './session-types'
@@ -40,6 +40,11 @@ export interface CreateSessionResult {
   sessionId: string
 }
 
+export interface CreateSessionError {
+  ok: false
+  error: string
+}
+
 export interface SessionSummary {
   id: string
   form: CreateSessionForm
@@ -54,6 +59,7 @@ export interface AskAiRequest {
   company?: string
   jobDescription?: string
   extraContext?: string
+  answerPreferences?: AnswerPreferences
 }
 
 export interface AskAiResult {
@@ -78,7 +84,7 @@ export interface SttStartResult {
 export interface MynaiApi {
   getSettings: () => Promise<AppSettings>
   setSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>
-  createSession: (form: CreateSessionForm) => Promise<CreateSessionResult>
+  createSession: (form: CreateSessionForm) => Promise<CreateSessionResult | CreateSessionError>
   listSessions: () => Promise<SessionSummary[]>
   askAi: (request: AskAiRequest) => Promise<AskAiResult | AskAiError>
   sttGetDesktopSources: () => Promise<DesktopSource[]>
