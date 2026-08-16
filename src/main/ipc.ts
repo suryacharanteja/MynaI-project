@@ -70,10 +70,6 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     }
   })
 
-  ipcMain.on(IPC_CHANNELS.windowClose, () => {
-    app.quit()
-  })
-
   ipcMain.handle(IPC_CHANNELS.getSettings, () => readSettings())
 
   ipcMain.handle(IPC_CHANNELS.setSettings, (_event, patch: Partial<AppSettings>) => {
@@ -133,6 +129,16 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   const stt = createAssemblyAiSttService(window.webContents)
   window.on('closed', () => stt.dispose())
+
+  ipcMain.on(IPC_CHANNELS.windowClose, () => {
+    // closable:false (required to suppress the native close button on a
+    // frameless stealth overlay) also makes graceful app.quit() no-op on
+    // Windows, since it tries the window's close path first and the window
+    // refuses. Tear down explicitly and force-exit instead.
+    stt.dispose()
+    if (!window.isDestroyed()) window.destroy()
+    app.exit(0)
+  })
 
   ipcMain.handle(IPC_CHANNELS.sttGetDesktopSources, async (): Promise<DesktopSource[]> => {
     const sources = await desktopCapturer.getSources({ types: ['screen'] })

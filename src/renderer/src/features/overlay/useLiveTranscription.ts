@@ -47,6 +47,13 @@ export function useLiveTranscription() {
 
       console.log('[auto-answer] stt:final', { source: e.source, text: e.text.slice(0, 80) })
 
+      // Question detection only runs on the "system" stream (the call's shared/output
+      // audio — the interviewer and other participants). The "mic" stream is the user's
+      // own voice; feeding your own answers back into the question detector is what was
+      // causing your own responses to trigger auto-answer. This mirrors ParakeetAI's
+      // dual-stream model: share stream = other party, mic = you.
+      if (e.source !== 'system') return
+
       const now = Date.now()
 
       // Accumulate recent turns so question detection sees a sliding window of
