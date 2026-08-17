@@ -9,7 +9,8 @@ const API_KEY_FIELDS: (keyof AppSettings)[] = [
   'assemblyAiApiKey',
   'openaiApiKey',
   'openCodeGoApiKey',
-  'openCodeZenApiKey'
+  'openCodeZenApiKey',
+  'deepseekApiKey'
 ]
 
 function settingsFilePath(): string {

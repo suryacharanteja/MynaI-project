@@ -28,6 +28,7 @@ export interface AppSettings {
   openaiApiKey: string | null
   openCodeGoApiKey: string | null
   openCodeZenApiKey: string | null
+  deepseekApiKey: string | null
 }
 
 export const defaultAppSettings: AppSettings = {
@@ -35,7 +36,8 @@ export const defaultAppSettings: AppSettings = {
   assemblyAiApiKey: null,
   openaiApiKey: null,
   openCodeGoApiKey: null,
-  openCodeZenApiKey: null
+  openCodeZenApiKey: null,
+  deepseekApiKey: null
 }
 
 export interface CreateSessionResult {

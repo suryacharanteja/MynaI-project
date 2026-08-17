@@ -26,7 +26,8 @@ const PROVIDER_LABELS = {
   gemini: 'Gemini',
   openai: 'OpenAI',
   'opencode-go': 'OpenCode Go',
-  'opencode-zen': 'OpenCode Zen'
+  'opencode-zen': 'OpenCode Zen',
+  deepseek: 'DeepSeek'
 } as const
 
 function apiKeyForProvider(settings: AppSettings, provider: AskAiRequest['provider']): string | null {
@@ -39,6 +40,8 @@ function apiKeyForProvider(settings: AppSettings, provider: AskAiRequest['provid
       return settings.openCodeGoApiKey
     case 'opencode-zen':
       return settings.openCodeZenApiKey
+    case 'deepseek':
+      return settings.deepseekApiKey
   }
 }
 

@@ -1,6 +1,6 @@
 import { z } from 'zod/v4'
 
-export const LLM_PROVIDERS = ['gemini', 'openai', 'opencode-go', 'opencode-zen'] as const
+export const LLM_PROVIDERS = ['gemini', 'openai', 'opencode-go', 'opencode-zen', 'deepseek'] as const
 export const SESSION_TYPES = ['interview', 'regular-call'] as const
 export const TONE_OPTIONS = ['conversational', 'formal', 'concise'] as const
 export const LENGTH_OPTIONS = ['short', 'medium', 'long'] as const
@@ -39,7 +39,8 @@ export const appSettingsSchema = z.object({
   assemblyAiApiKey: z.string().nullable().catch(null),
   openaiApiKey: z.string().nullable().catch(null),
   openCodeGoApiKey: z.string().nullable().catch(null),
-  openCodeZenApiKey: z.string().nullable().catch(null)
+  openCodeZenApiKey: z.string().nullable().catch(null),
+  deepseekApiKey: z.string().nullable().catch(null)
 })
 
 export const sessionMetadataSchema = z.object({

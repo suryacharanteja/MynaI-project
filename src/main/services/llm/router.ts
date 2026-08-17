@@ -1,6 +1,6 @@
 import type { AskParams, AnswerResult, LlmProvider } from './types'
 import { askGemini } from './gemini'
-import { askOpenAi, askOpenCodeGo, askOpenCodeZen } from './openai-compatible'
+import { askOpenAi, askOpenCodeGo, askOpenCodeZen, askDeepSeek } from './openai-compatible'
 
 const MAX_RETRIES = 3
 const RETRY_DELAYS = [1000, 2000, 4000]
@@ -92,6 +92,8 @@ function dispatch(provider: LlmProvider, params: AskParams): Promise<AnswerResul
       return askOpenCodeGo(params)
     case 'opencode-zen':
       return askOpenCodeZen(params)
+    case 'deepseek':
+      return askDeepSeek(params)
   }
 }
 

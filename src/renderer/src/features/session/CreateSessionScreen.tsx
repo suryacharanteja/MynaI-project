@@ -19,7 +19,8 @@ const PROVIDER_LABELS: Record<LlmProvider, string> = {
   gemini: 'Gemini',
   openai: 'OpenAI',
   'opencode-go': 'OpenCode Go',
-  'opencode-zen': 'OpenCode Zen (Free)'
+  'opencode-zen': 'OpenCode Zen (Free)',
+  deepseek: 'DeepSeek'
 }
 const PROVIDER_MODELS: Record<LlmProvider, ModelOption[]> = {
   gemini: ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.5-pro'].map((m) => ({
@@ -63,6 +64,10 @@ const PROVIDER_MODELS: Record<LlmProvider, ModelOption[]> = {
     { value: 'laguna-s-2.1-free', label: 'Laguna S 2.1 (Free)' },
     { value: 'nemotron-3-ultra-free', label: 'Nemotron 3 Ultra (Free)' },
     { value: 'nemotron-3.5-lightning-free', label: 'Nemotron 3.5 Lightning (Free)' }
+  ],
+  deepseek: [
+    { value: 'deepseek-chat', label: 'DeepSeek Chat' },
+    { value: 'deepseek-reasoner', label: 'DeepSeek Reasoner' }
   ]
 }
 const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Spanish', 'French']
@@ -71,7 +76,8 @@ const API_KEY_FOR_PROVIDER: Record<LlmProvider, string> = {
   gemini: 'geminiApiKey',
   openai: 'openaiApiKey',
   'opencode-go': 'openCodeGoApiKey',
-  'opencode-zen': 'openCodeZenApiKey'
+  'opencode-zen': 'openCodeZenApiKey',
+  deepseek: 'deepseekApiKey'
 }
 
 type FieldErrors = Record<string, string>

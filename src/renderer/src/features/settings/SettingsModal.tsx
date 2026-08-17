@@ -9,6 +9,7 @@ const KEY_FIELDS: { key: keyof AppSettings; label: string; placeholder: string }
   { key: 'openaiApiKey', label: 'OpenAI API Key', placeholder: 'sk-...' },
   { key: 'openCodeGoApiKey', label: 'OpenCode Go API Key', placeholder: '...' },
   { key: 'openCodeZenApiKey', label: 'OpenCode Zen API Key', placeholder: '...' },
+  { key: 'deepseekApiKey', label: 'DeepSeek API Key', placeholder: 'sk-...' },
   { key: 'assemblyAiApiKey', label: 'AssemblyAI API Key', placeholder: '...' }
 ]
 

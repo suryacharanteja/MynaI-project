@@ -1,7 +1,7 @@
 import type { AnswerPreferences } from '../../../shared/session-types'
 import { answerResultSchema } from '../../../shared/schemas'
 
-export type LlmProvider = 'gemini' | 'openai' | 'opencode-go' | 'opencode-zen'
+export type LlmProvider = 'gemini' | 'openai' | 'opencode-go' | 'opencode-zen' | 'deepseek'
 
 export interface AskParams {
   apiKey: string

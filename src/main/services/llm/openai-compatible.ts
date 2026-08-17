@@ -48,3 +48,7 @@ export function askOpenCodeGo(params: AskParams): Promise<AnswerResult> {
 export function askOpenCodeZen(params: AskParams): Promise<AnswerResult> {
   return askOpenAiCompatible(params, { baseUrl: 'https://opencode.ai/zen/v1', providerLabel: 'OpenCode Zen' })
 }
+
+export function askDeepSeek(params: AskParams): Promise<AnswerResult> {
+  return askOpenAiCompatible(params, { baseUrl: 'https://api.deepseek.com/v1', providerLabel: 'DeepSeek' })
+}
