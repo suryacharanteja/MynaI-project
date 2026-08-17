@@ -8,7 +8,10 @@ export const IPC_CHANNELS = {
   setSettings: 'app:setSettings',
   createSession: 'session:create',
   listSessions: 'session:list',
-  askAi: 'ai:ask',
+  aiAskStart: 'ai:askStart',
+  aiChunk: 'ai:chunk',
+  aiDone: 'ai:done',
+  aiError: 'ai:error',
   sttGetDesktopSources: 'stt:getDesktopSources',
   sttStart: 'stt:start',
   sttStop: 'stt:stop',
@@ -58,6 +61,7 @@ export interface SessionSummary {
 }
 
 export interface AskAiRequest {
+  cardId: string
   question: string
   provider: LlmProvider
   model: string
@@ -67,18 +71,26 @@ export interface AskAiRequest {
   answerPreferences?: AnswerPreferences
 }
 
-export interface AskAiResult {
-  question: string
-  answer: string
-  keySteps: string[]
-  code: { language: string; content: string } | null
-  explanation: string
-  timeComplexity: string | null
-  spaceComplexity: string | null
+export interface AskAiStartResult {
+  cardId: string
+  error?: string
 }
 
-export interface AskAiError {
+export interface AskAiChunkEvent {
+  cardId: string
+  delta: string
+}
+
+export interface AskAiDoneEvent {
+  cardId: string
+}
+
+export interface AskAiErrorEvent {
+  cardId: string
   error: string
+  /** true = content had already streamed in before the failure — the
+   *  renderer should append a trailing note, not clear/replace the card. */
+  partial: boolean
 }
 
 export interface SttStartResult {
@@ -91,7 +103,10 @@ export interface MynaiApi {
   setSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>
   createSession: (form: CreateSessionForm) => Promise<CreateSessionResult | CreateSessionError>
   listSessions: () => Promise<SessionSummary[]>
-  askAi: (request: AskAiRequest) => Promise<AskAiResult | AskAiError>
+  askAiStart: (request: AskAiRequest) => Promise<AskAiStartResult>
+  onAiChunk: (callback: (event: AskAiChunkEvent) => void) => () => void
+  onAiDone: (callback: (event: AskAiDoneEvent) => void) => () => void
+  onAiError: (callback: (event: AskAiErrorEvent) => void) => () => void
   sttGetDesktopSources: () => Promise<DesktopSource[]>
   sttStart: (source: string) => Promise<SttStartResult>
   sttStop: (source: string) => Promise<void>

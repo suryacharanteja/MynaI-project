@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { IPC_CHANNELS, type AppSettings, type AskAiRequest, type MynaiApi } from '../shared/ipc-contract'
+import {
+  IPC_CHANNELS,
+  type AppSettings,
+  type AskAiRequest,
+  type AskAiChunkEvent,
+  type AskAiDoneEvent,
+  type AskAiErrorEvent,
+  type MynaiApi
+} from '../shared/ipc-contract'
 import type { CreateSessionForm } from '../shared/session-types'
 import type { SttErrorEvent, SttStatusEvent, SttTranscriptEvent } from '../shared/stt-types'
 
@@ -14,7 +22,10 @@ const api: MynaiApi = {
   setSettings: (patch: Partial<AppSettings>) => ipcRenderer.invoke(IPC_CHANNELS.setSettings, patch),
   createSession: (form: CreateSessionForm) => ipcRenderer.invoke(IPC_CHANNELS.createSession, form),
   listSessions: () => ipcRenderer.invoke(IPC_CHANNELS.listSessions),
-  askAi: (request: AskAiRequest) => ipcRenderer.invoke(IPC_CHANNELS.askAi, request),
+  askAiStart: (request: AskAiRequest) => ipcRenderer.invoke(IPC_CHANNELS.aiAskStart, request),
+  onAiChunk: (callback: (event: AskAiChunkEvent) => void) => subscribe(IPC_CHANNELS.aiChunk, callback),
+  onAiDone: (callback: (event: AskAiDoneEvent) => void) => subscribe(IPC_CHANNELS.aiDone, callback),
+  onAiError: (callback: (event: AskAiErrorEvent) => void) => subscribe(IPC_CHANNELS.aiError, callback),
 
   sttGetDesktopSources: () => ipcRenderer.invoke(IPC_CHANNELS.sttGetDesktopSources),
   sttStart: (source: string) => ipcRenderer.invoke(IPC_CHANNELS.sttStart, source),

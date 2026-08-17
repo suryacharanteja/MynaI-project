@@ -51,6 +51,7 @@ export const sessionMetadataSchema = z.object({
 })
 
 export const askAiRequestSchema = z.object({
+  cardId: z.string().min(1),
   question: z.string().min(1, 'Question cannot be empty'),
   provider: z.enum(LLM_PROVIDERS),
   model: z.string().min(1),

@@ -1,5 +1,4 @@
 import type { AnswerPreferences } from '../../../shared/session-types'
-import { answerResultSchema } from '../../../shared/schemas'
 
 export type LlmProvider = 'gemini' | 'openai' | 'opencode-go' | 'opencode-zen' | 'deepseek'
 
@@ -13,25 +12,37 @@ export interface AskParams {
   answerPreferences?: AnswerPreferences
 }
 
-export interface AnswerResult {
-  question: string
-  answer: string
-  keySteps: string[]
-  code: { language: string; content: string } | null
-  explanation: string
-  timeComplexity: string | null
-  spaceComplexity: string | null
-}
+/**
+ * Sentinel markers instead of a JSON object. A JSON blob can't be validly
+ * parsed — or rendered — until the whole thing has arrived; that was the
+ * actual cause of answers appearing "all at once" after a 3-4s wait, not
+ * network speed. Plain-text markers let each section render the instant its
+ * marker streams past, well before the response finishes. Bracketed
+ * sentinels (not markdown `##` headers) avoid false-positive collisions with
+ * content the model might generate, e.g. a code comment reading "# Key Steps".
+ */
+export const RESPONSE_FORMAT_INSTRUCTIONS = `Format your response using these exact section markers, each alone on its own line. Do not use markdown headers (#) or fenced code blocks (\`\`\`) anywhere — use only the markers below. Only <<<ANSWER>>> is required; omit any other section entirely if it doesn't apply.
 
-export const RESPONSE_SCHEMA_INSTRUCTIONS = `Respond ONLY with a single JSON object, no markdown fences, matching exactly this shape:
-{
-  "answer": string,            // the main answer, 1-4 sentences, plain prose
-  "keySteps": string[],        // short bullet steps; [] if not applicable
-  "code": { "language": string, "content": string } | null,  // only if code is the natural output
-  "explanation": string,       // 1-2 sentences of extra context/reasoning; "" if not needed
-  "timeComplexity": string | null,
-  "spaceComplexity": string | null
-}`
+<<<ANSWER>>>
+The main answer, 1-4 sentences, plain prose, first person as the candidate.
+
+<<<KEY_STEPS>>>
+- short bullet step
+- short bullet step
+(omit this section if not applicable)
+
+<<<CODE:language>>>
+code only, no fences
+(omit this section if code isn't the natural output)
+
+<<<EXPLANATION>>>
+1-2 sentences of extra context or reasoning
+(omit this section if not needed)
+
+<<<COMPLEXITY>>>
+Time: O(...)
+Space: O(...)
+(omit this section if not applicable)`
 
 export function buildPrompt(params: AskParams): string {
   const contextLines = [
@@ -56,41 +67,8 @@ export function buildPrompt(params: AskParams): string {
     contextLines.length > 0 ? contextLines.join('\n') : null,
     prefLines.length > 0 ? prefLines.join(' ') : null,
     `Question: ${params.question}`,
-    RESPONSE_SCHEMA_INSTRUCTIONS
+    RESPONSE_FORMAT_INSTRUCTIONS
   ]
     .filter(Boolean)
     .join('\n\n')
-}
-
-export function extractJson(text: string): string {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
-  if (fenced) return fenced[1].trim()
-  const start = text.indexOf('{')
-  const end = text.lastIndexOf('}')
-  if (start !== -1 && end !== -1 && end > start) {
-    return text.slice(start, end + 1)
-  }
-  return text
-}
-
-export function parseAnswerJson(question: string, text: string): AnswerResult {
-  let raw: unknown
-  try {
-    raw = JSON.parse(extractJson(text))
-  } catch {
-    return {
-      question,
-      answer: text,
-      keySteps: [],
-      code: null,
-      explanation: '',
-      timeComplexity: null,
-      spaceComplexity: null
-    }
-  }
-
-  const parsed = answerResultSchema.safeParse(raw)
-  const data = parsed.success ? parsed.data : answerResultSchema.parse({})
-
-  return { question, ...data }
 }

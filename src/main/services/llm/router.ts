@@ -1,36 +1,76 @@
-import type { AskParams, AnswerResult, LlmProvider } from './types'
+import type { AskParams, LlmProvider } from './types'
 import { askGemini } from './gemini'
 import { askOpenAi, askOpenCodeGo, askOpenCodeZen, askDeepSeek } from './openai-compatible'
 
 const MAX_RETRIES = 3
 const RETRY_DELAYS = [1000, 2000, 4000]
-// Neither the Gemini SDK call nor the OpenAI-compatible fetch calls carry a
-// timeout of their own. If the underlying request hangs — never resolving OR
-// rejecting, which a stalled network or an overloaded model can do — the
-// promise never settles and the answer card sits at "Streaming..." forever,
-// with no error to retry on or surface. This bounds every attempt so a hang
-// always eventually turns into a retryable/classifiable error instead.
-const REQUEST_TIMEOUT_MS = 25000
+// Two timeout regimes instead of one fixed request-length ceiling: a
+// generous "did the model even start responding" timeout before the first
+// chunk, then a much shorter "stalled mid-stream" timeout rearmed on every
+// chunk after — directly analogous to the STT ping/pong watchdog
+// (assemblyai.ts) judging liveness by actual activity, not elapsed time.
+const FIRST_CHUNK_TIMEOUT_MS = 25000
+const STALL_TIMEOUT_MS = 15000
+
+type OnChunk = (text: string) => void
+export type LlmError = Error & { partial?: boolean }
 
 class LlmTimeoutError extends Error {
-  constructor() {
-    super('Request timed out')
+  constructor(message: string) {
+    super(message)
     this.name = 'LlmTimeoutError'
   }
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+function dispatch(provider: LlmProvider, params: AskParams, onChunk: OnChunk): Promise<void> {
+  switch (provider) {
+    case 'gemini':
+      return askGemini(params, onChunk)
+    case 'openai':
+      return askOpenAi(params, onChunk)
+    case 'opencode-go':
+      return askOpenCodeGo(params, onChunk)
+    case 'opencode-zen':
+      return askOpenCodeZen(params, onChunk)
+    case 'deepseek':
+      return askDeepSeek(params, onChunk)
+  }
+}
+
+function dispatchWithWatchdog(provider: LlmProvider, params: AskParams, onChunk: OnChunk): Promise<void> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new LlmTimeoutError()), ms)
-    promise.then(
-      (value) => {
+    let firstChunkReceived = false
+    let settled = false
+    let timer: ReturnType<typeof setTimeout>
+
+    function settleReject(error: LlmError): void {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      error.partial = firstChunkReceived
+      reject(error)
+    }
+
+    function armTimer(ms: number, message: string): void {
+      timer = setTimeout(() => settleReject(new LlmTimeoutError(message)), ms)
+    }
+
+    armTimer(FIRST_CHUNK_TIMEOUT_MS, 'Request timed out')
+
+    dispatch(provider, params, (text) => {
+      if (settled) return
+      firstChunkReceived = true
+      clearTimeout(timer)
+      armTimer(STALL_TIMEOUT_MS, 'Connection stalled')
+      onChunk(text)
+    }).then(
+      () => {
+        if (settled) return
+        settled = true
         clearTimeout(timer)
-        resolve(value)
+        resolve()
       },
-      (error) => {
-        clearTimeout(timer)
-        reject(error)
-      }
+      (error) => settleReject(error instanceof Error ? error : new Error(String(error)))
     )
   })
 }
@@ -57,7 +97,9 @@ function isRetryable(error: unknown): boolean {
 function classifyError(error: unknown): string {
   if (!(error instanceof Error)) return 'Ask AI failed.'
   if (error instanceof LlmTimeoutError) {
-    return 'The AI took too long to respond. Please try again.'
+    return error.message === 'Connection stalled'
+      ? 'The connection stalled mid-response.'
+      : 'The AI took too long to respond. Please try again.'
   }
   const msg = error.message.toLowerCase()
   if (msg.includes('401') || msg.includes('403') || msg.includes('invalid') && msg.includes('key')) {
@@ -82,34 +124,33 @@ function classifyError(error: unknown): string {
   return error.message.slice(0, 300)
 }
 
-function dispatch(provider: LlmProvider, params: AskParams): Promise<AnswerResult> {
-  switch (provider) {
-    case 'gemini':
-      return askGemini(params)
-    case 'openai':
-      return askOpenAi(params)
-    case 'opencode-go':
-      return askOpenCodeGo(params)
-    case 'opencode-zen':
-      return askOpenCodeZen(params)
-    case 'deepseek':
-      return askDeepSeek(params)
-  }
-}
-
-export async function askLlm(provider: LlmProvider, params: AskParams): Promise<AnswerResult> {
-  let lastError: unknown
+/**
+ * Resolves once the stream completes cleanly (onChunk already delivered
+ * every token). Rejects with an LlmError carrying `.partial` — true means
+ * content had already started streaming when it failed, so the caller
+ * should append a trailing error rather than replace what's shown.
+ */
+export async function askLlm(provider: LlmProvider, params: AskParams, onChunk: OnChunk): Promise<void> {
+  let lastError: LlmError | undefined
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      return await withTimeout(dispatch(provider, params), REQUEST_TIMEOUT_MS)
+      await dispatchWithWatchdog(provider, params, onChunk)
+      return
     } catch (error) {
-      lastError = error
-      if (attempt < MAX_RETRIES && isRetryable(error)) {
+      const err = error as LlmError
+      lastError = err
+      // Once the user has seen partial content, don't silently retry — that
+      // would either duplicate what's already shown or restart into a
+      // confusing mix. Surface it instead.
+      if (err.partial) break
+      if (attempt < MAX_RETRIES && isRetryable(err)) {
         await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt]))
         continue
       }
       break
     }
   }
-  throw new Error(classifyError(lastError))
+  const finalError: LlmError = new Error(classifyError(lastError))
+  finalError.partial = lastError?.partial ?? false
+  throw finalError
 }

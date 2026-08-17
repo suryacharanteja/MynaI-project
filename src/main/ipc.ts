@@ -2,9 +2,8 @@ import { app, desktopCapturer, ipcMain, screen, type BrowserWindow, type IpcMain
 import {
   IPC_CHANNELS,
   type AppSettings,
-  type AskAiError,
   type AskAiRequest,
-  type AskAiResult,
+  type AskAiStartResult,
   type CreateSessionError,
   type CreateSessionResult,
   type SessionSummary,
@@ -12,9 +11,10 @@ import {
 } from '../shared/ipc-contract'
 import type { DesktopSource } from '../shared/stt-types'
 import { readSettings, writeSettings } from './store'
-import { askLlm } from './services/llm/router'
+import { askLlm, type LlmError } from './services/llm/router'
 import { createSession, listSessions } from './sessions/store'
 import { createAssemblyAiSttService } from './services/stt/assemblyai'
+import { safeSend } from './utils/safe-send'
 import {
   appSettingsSchema,
   askAiRequestSchema,
@@ -101,21 +101,35 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle(IPC_CHANNELS.listSessions, (): SessionSummary[] => listSessions())
 
   ipcMain.handle(
-    IPC_CHANNELS.askAi,
-    async (_event, request: unknown): Promise<AskAiResult | AskAiError> => {
+    IPC_CHANNELS.aiAskStart,
+    (_event, request: unknown): AskAiStartResult => {
       const parsed = askAiRequestSchema.safeParse(request)
       if (!parsed.success) {
         const firstIssue = parsed.error.issues[0]
-        return { error: firstIssue?.message ?? 'Invalid request' }
+        // No cardId to report against if the payload itself failed to parse
+        // (cardId is one of the fields being validated) — fall back to a
+        // synthetic id so the renderer still gets a scoped error result.
+        const cardId = typeof (request as Partial<AskAiRequest>)?.cardId === 'string'
+          ? (request as AskAiRequest).cardId
+          : 'invalid-request'
+        return { cardId, error: firstIssue?.message ?? 'Invalid request' }
       }
       const req = parsed.data
       const settings = readSettings()
       const apiKey = apiKeyForProvider(settings, req.provider)
       if (!apiKey) {
-        return { error: `No ${PROVIDER_LABELS[req.provider]} API key configured. Open Settings and add one.` }
+        return {
+          cardId: req.cardId,
+          error: `No ${PROVIDER_LABELS[req.provider]} API key configured. Open Settings and add one.`
+        }
       }
-      try {
-        return await askLlm(req.provider, {
+
+      // Fire-and-forget: the renderer gets an immediate {cardId} ack and then
+      // hears the actual answer arrive as ai:chunk/ai:done/ai:error pushes,
+      // scoped by cardId (mirrors the sttStatus/sttPartial/sttFinal pattern).
+      askLlm(
+        req.provider,
+        {
           apiKey,
           model: req.model,
           question: req.question,
@@ -123,10 +137,19 @@ export function registerIpcHandlers(window: BrowserWindow): void {
           jobDescription: req.jobDescription,
           extraContext: req.extraContext,
           answerPreferences: req.answerPreferences
-        })
-      } catch (error) {
-        return { error: error instanceof Error ? error.message : 'Ask AI failed.' }
-      }
+        },
+        (delta) => safeSend(window.webContents, IPC_CHANNELS.aiChunk, { cardId: req.cardId, delta })
+      ).then(
+        () => safeSend(window.webContents, IPC_CHANNELS.aiDone, { cardId: req.cardId }),
+        (error: LlmError) =>
+          safeSend(window.webContents, IPC_CHANNELS.aiError, {
+            cardId: req.cardId,
+            error: error.message,
+            partial: error.partial ?? false
+          })
+      )
+
+      return { cardId: req.cardId }
     }
   )
 
