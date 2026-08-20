@@ -20,6 +20,17 @@ const RECENT_QUESTIONS_LIMIT = 20
  * question still fires promptly the moment the interviewer stops talking.
  */
 const SILENCE_DEBOUNCE_MS = 1800
+/**
+ * Used instead of SILENCE_DEBOUNCE_MS when the buffer doesn't yet end with
+ * "?" — e.g. "So, uh, describe an AI project you led that failed." is
+ * already a complete, dispatchable question on its own (matches
+ * isLikelyQuestion), but interviewers routinely follow it with a related
+ * second sentence half a beat later: "What went wrong and how did you
+ * pivot?" A period-ending clause is a much weaker "I'm done talking" signal
+ * than a question mark, so give it more room before committing — this is
+ * what stops that from firing as two separate auto-answer cards.
+ */
+const SILENCE_DEBOUNCE_NO_QUESTION_MARK_MS = 3200
 /** Safety valve: if the interviewer talks continuously with no pause longer
  *  than the debounce, don't wait forever — force an evaluation once the
  *  buffer has been accumulating this long. */
@@ -116,7 +127,9 @@ export function useLiveTranscription() {
       if (oldestAge >= MAX_BUFFER_MS) {
         evaluateBuffer()
       } else {
-        silenceTimerRef.current = setTimeout(evaluateBuffer, SILENCE_DEBOUNCE_MS)
+        const combinedSoFar = bufferRef.current.map((t) => t.text).join(' ').trim()
+        const debounce = combinedSoFar.endsWith('?') ? SILENCE_DEBOUNCE_MS : SILENCE_DEBOUNCE_NO_QUESTION_MARK_MS
+        silenceTimerRef.current = setTimeout(evaluateBuffer, debounce)
       }
     })
     const unsubError = window.mynai.onSttError((e) => setError(e.error))
