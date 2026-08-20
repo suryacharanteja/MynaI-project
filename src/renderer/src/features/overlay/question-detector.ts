@@ -63,6 +63,22 @@ export function isLikelyQuestion(text: string): boolean {
   return false
 }
 
+// Devanagari, CJK, Hiragana/Katakana, Hangul, Arabic, Cyrillic. AssemblyAI's
+// real-time streaming model is English-only — when fed a low-quality or
+// silent audio segment, it can hallucinate plausible-looking text in one of
+// these scripts rather than failing cleanly (a known failure mode of
+// transformer ASR under poor SNR). Left unfiltered, that garbage was landing
+// in the transcript and feeding the auto-answer question buffer, corrupting
+// both the display and whatever got sent to the LLM.
+const NON_LATIN_SCRIPT = /[ऀ-ॿ一-鿿぀-ヿ가-힯؀-ۿЀ-ӿ]/g
+
+export function isLikelyGarbledTranscript(text: string): boolean {
+  const letters = text.match(/[\p{L}]/gu)
+  if (!letters || letters.length < 4) return false
+  const nonLatinCount = (text.match(NON_LATIN_SCRIPT) ?? []).length
+  return nonLatinCount / letters.length > 0.3
+}
+
 function normalizeForDedupe(text: string): string {
   return text.trim().toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ')
 }

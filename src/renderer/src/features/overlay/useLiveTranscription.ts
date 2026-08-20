@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createAudioCapture } from '../audio/capture'
 import { useOverlayStore } from '../../stores/overlay-store'
 import { useSessionStore } from '../../stores/session-store'
-import { isLikelyQuestion, isDuplicateQuestion } from './question-detector'
+import { isLikelyQuestion, isDuplicateQuestion, isLikelyGarbledTranscript } from './question-detector'
 import { askAiAndAddCard } from './ask-ai'
 
 const AUTO_ANSWER_COOLDOWN_MS = 1200
@@ -86,6 +86,13 @@ export function useLiveTranscription() {
     const unsubPartial = window.mynai.onSttPartial((e) => setPartialText(e.source, e.text))
     const unsubFinal = window.mynai.onSttFinal((e) => {
       setPartialText(e.source, '')
+
+      // Drop apparent ASR hallucinations (see isLikelyGarbledTranscript) before
+      // they reach the transcript display or the auto-answer buffer — showing
+      // garbage in the transcript and feeding it to the LLM as a "question" is
+      // worse than silently dropping one turn's worth of audio.
+      if (isLikelyGarbledTranscript(e.text)) return
+
       addTranscriptMessage({
         id: `${e.source}-${Date.now()}`,
         source: e.source,

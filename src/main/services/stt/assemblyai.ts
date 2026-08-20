@@ -233,7 +233,19 @@ export function createAssemblyAiSttService(webContents: WebContents) {
             break
           case 'Turn':
             if (msg.transcript) {
-              send(msg.end_of_turn ? 'stt:final' : 'stt:partial', { source, text: msg.transcript })
+              // With format_turns=true (set below), AssemblyAI sends TWO
+              // end_of_turn:true messages per turn_order for the same
+              // utterance: an unformatted final first, then a formatted
+              // final right after (their own docs: "render the latest
+              // transcript; do not append"). Treating both as separate
+              // finals was appending both into the transcript/auto-answer
+              // buffer, producing duplicated openers like "Write a write a
+              // Python program...". Only the fully formatted final
+              // (end_of_turn && turn_is_formatted) is the real final; the
+              // unformatted one is forwarded as a partial update instead so
+              // the live transcript still updates promptly.
+              const isTrulyFinal = msg.end_of_turn === true && msg.turn_is_formatted === true
+              send(isTrulyFinal ? 'stt:final' : 'stt:partial', { source, text: msg.transcript })
             }
             break
           case 'Termination':
