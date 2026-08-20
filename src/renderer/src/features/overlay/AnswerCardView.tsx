@@ -1,11 +1,48 @@
 import { useState } from 'react'
-import { MessageCircle, Star, ListChecks, Code2, Lightbulb, Clock, Database, Copy, Check } from 'lucide-react'
+import {
+  MessageCircle,
+  Star,
+  ListChecks,
+  Code2,
+  Lightbulb,
+  Clock,
+  Database,
+  Copy,
+  Check,
+  Pencil,
+  Plus,
+  Send,
+  Loader2
+} from 'lucide-react'
 import { toast } from 'sonner'
-import type { AnswerCard } from '@shared/transcript-types'
+import type { AnswerCard, FollowUpEntry } from '@shared/transcript-types'
 import { MarkdownLite } from './MarkdownLite'
+import { useSessionStore } from '../../stores/session-store'
+import { reAskCard, askFollowUp } from './ask-ai'
+
+const FOLLOW_UP_CHIPS = [
+  { label: '+ Code', instruction: 'Add the code for this.' },
+  { label: '+ More detail', instruction: 'Give more detail on this answer.' },
+  { label: '+ Complexity', instruction: 'Add the time and space complexity for this.' }
+]
+
+interface AnswerBody {
+  answer: string
+  keySteps?: string[]
+  code?: { language: string; content: string }
+  explanation?: string
+  timeComplexity?: string
+  spaceComplexity?: string
+}
 
 export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Element {
   const [copied, setCopied] = useState(false)
+  const [editingQuestion, setEditingQuestion] = useState(false)
+  const [questionDraft, setQuestionDraft] = useState(card.question)
+  const [followUpText, setFollowUpText] = useState('')
+  const [followUpBusy, setFollowUpBusy] = useState(false)
+
+  const busy = card.status === 'streaming' || followUpBusy
 
   async function handleCopy(): Promise<void> {
     const parts = [card.answer]
@@ -28,11 +65,68 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
     }
   }
 
+  function handleReAsk(): void {
+    const corrected = questionDraft.trim()
+    if (!corrected || busy) return
+    setEditingQuestion(false)
+    reAskCard(card.id, corrected, useSessionStore.getState().form)
+  }
+
+  async function sendFollowUp(instruction: string): Promise<void> {
+    if (!instruction.trim() || busy) return
+    setFollowUpBusy(true)
+    setFollowUpText('')
+    await askFollowUp(card.id, instruction.trim(), useSessionStore.getState().form)
+    setFollowUpBusy(false)
+  }
+
   return (
     <div className="space-y-4 p-4">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-2">
         <Section icon={<MessageCircle size={14} />} label="Question">
-          <p className="text-sm text-neutral-300">{card.question}</p>
+          {editingQuestion ? (
+            <div className="space-y-1.5">
+              <textarea
+                value={questionDraft}
+                onChange={(e) => setQuestionDraft(e.target.value)}
+                rows={2}
+                className="w-full rounded-md border border-white/15 bg-black/30 p-1.5 text-sm text-neutral-200 outline-none focus:border-white/30"
+                autoFocus
+              />
+              <div className="flex gap-1.5">
+                <button
+                  onClick={handleReAsk}
+                  disabled={busy || !questionDraft.trim()}
+                  className="rounded-md bg-white/15 px-2 py-1 text-xs font-medium text-white transition hover:bg-white/25 disabled:opacity-40"
+                >
+                  Re-ask
+                </button>
+                <button
+                  onClick={() => {
+                    setQuestionDraft(card.question)
+                    setEditingQuestion(false)
+                  }}
+                  className="rounded-md px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="group flex items-start gap-1.5">
+              <p className="text-sm text-neutral-300">{card.question}</p>
+              <button
+                onClick={() => {
+                  setQuestionDraft(card.question)
+                  setEditingQuestion(true)
+                }}
+                title="Question captured wrong? Edit and re-ask"
+                className="mt-0.5 shrink-0 rounded p-0.5 text-neutral-600 opacity-0 transition hover:text-neutral-300 group-hover:opacity-100"
+              >
+                <Pencil size={11} />
+              </button>
+            </div>
+          )}
         </Section>
         <button
           onClick={handleCopy}
@@ -43,54 +137,145 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
         </button>
       </div>
 
-      <Section icon={<Star size={14} />} label="Answer">
-        <MarkdownLite text={card.answer} />
-      </Section>
-
-      {card.keySteps && card.keySteps.length > 0 && (
-        <Section icon={<ListChecks size={14} />} label="Key Steps">
-          <ol className="list-decimal space-y-1 pl-5 text-sm text-neutral-200">
-            {card.keySteps.map((step, i) => (
-              <li key={i}>{step}</li>
-            ))}
-          </ol>
-        </Section>
-      )}
-
-      {card.code && (
-        <Section icon={<Code2 size={14} />} label="Code">
-          <pre className="overflow-x-auto rounded-lg bg-black/60 p-3 font-mono text-xs leading-relaxed text-emerald-200">
-            <code>{card.code.content}</code>
-          </pre>
-        </Section>
-      )}
-
-      {card.explanation && (
-        <Section icon={<Lightbulb size={14} />} label="Explanation">
-          <MarkdownLite text={card.explanation} />
-        </Section>
-      )}
-
-      {(card.timeComplexity || card.spaceComplexity) && (
-        <div className="flex gap-4 text-xs text-neutral-400">
-          {card.timeComplexity && (
-            <span className="flex items-center gap-1">
-              <Clock size={12} /> Time: {card.timeComplexity}
-            </span>
-          )}
-          {card.spaceComplexity && (
-            <span className="flex items-center gap-1">
-              <Database size={12} /> Space: {card.spaceComplexity}
-            </span>
-          )}
-        </div>
-      )}
+      <AnswerBodyView body={card} />
 
       {card.status === 'streaming' && (
         <div className="flex items-center gap-1.5 text-xs text-neutral-500">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400" />
           Streaming...
         </div>
+      )}
+
+      {card.followUps?.map((entry, i) => <FollowUpBlock key={i} entry={entry} />)}
+
+      {card.pendingFollowUp && <PendingFollowUpBlock pending={card.pendingFollowUp} busy={followUpBusy} />}
+
+      {card.status !== 'streaming' && (
+        <div className="space-y-2 border-t border-white/10 pt-3">
+          <div className="flex flex-wrap gap-1.5">
+            {FOLLOW_UP_CHIPS.map((chip) => (
+              <button
+                key={chip.label}
+                onClick={() => sendFollowUp(chip.instruction)}
+                disabled={busy}
+                className="flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-xs text-neutral-300 transition hover:bg-white/15 disabled:opacity-40"
+              >
+                <Plus size={11} />
+                {chip.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <input
+              value={followUpText}
+              onChange={(e) => setFollowUpText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') sendFollowUp(followUpText)
+              }}
+              placeholder="Add something to this answer…"
+              disabled={busy}
+              className="flex-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-neutral-100 placeholder:text-neutral-500 outline-none focus:border-white/25 disabled:opacity-40"
+            />
+            <button
+              onClick={() => sendFollowUp(followUpText)}
+              disabled={busy || !followUpText.trim()}
+              className="shrink-0 rounded-lg bg-white/10 p-1.5 text-neutral-300 transition hover:bg-white/20 disabled:opacity-40"
+            >
+              {followUpBusy ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AnswerBodyView({ body }: { body: AnswerBody }): React.JSX.Element {
+  return (
+    <>
+      <Section icon={<Star size={14} />} label="Answer">
+        <MarkdownLite text={body.answer} />
+      </Section>
+
+      {body.keySteps && body.keySteps.length > 0 && (
+        <Section icon={<ListChecks size={14} />} label="Key Steps">
+          <ol className="list-decimal space-y-1 pl-5 text-sm text-neutral-200">
+            {body.keySteps.map((step, i) => (
+              <li key={i}>{step}</li>
+            ))}
+          </ol>
+        </Section>
+      )}
+
+      {body.code && (
+        <Section icon={<Code2 size={14} />} label="Code">
+          <pre className="overflow-x-auto rounded-lg bg-black/60 p-3 font-mono text-xs leading-relaxed text-emerald-200">
+            <code>{body.code.content}</code>
+          </pre>
+        </Section>
+      )}
+
+      {body.explanation && (
+        <Section icon={<Lightbulb size={14} />} label="Explanation">
+          <MarkdownLite text={body.explanation} />
+        </Section>
+      )}
+
+      {(body.timeComplexity || body.spaceComplexity) && (
+        <div className="flex gap-4 text-xs text-neutral-400">
+          {body.timeComplexity && (
+            <span className="flex items-center gap-1">
+              <Clock size={12} /> Time: {body.timeComplexity}
+            </span>
+          )}
+          {body.spaceComplexity && (
+            <span className="flex items-center gap-1">
+              <Database size={12} /> Space: {body.spaceComplexity}
+            </span>
+          )}
+        </div>
+      )}
+    </>
+  )
+}
+
+function FollowUpBlock({ entry }: { entry: FollowUpEntry }): React.JSX.Element {
+  const isError = entry.answer.startsWith('⚠️')
+  return (
+    <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+      <p className="text-xs font-medium text-neutral-400">↳ {entry.instruction}</p>
+      {isError ? (
+        <p className="text-xs text-red-400">{entry.answer}</p>
+      ) : (
+        <AnswerBodyView body={entry} />
+      )}
+    </div>
+  )
+}
+
+function PendingFollowUpBlock({
+  pending,
+  busy
+}: {
+  pending: Omit<FollowUpEntry, 'createdAt'>
+  busy: boolean
+}): React.JSX.Element {
+  const isError = pending.answer.startsWith('⚠️')
+  return (
+    <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+      <p className="text-xs font-medium text-neutral-400">↳ {pending.instruction}</p>
+      {isError ? (
+        <p className="text-xs text-red-400">{pending.answer}</p>
+      ) : (
+        <>
+          <AnswerBodyView body={pending} />
+          {busy && (
+            <div className="flex items-center gap-1.5 text-xs text-neutral-500">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400" />
+              Adding...
+            </div>
+          )}
+        </>
       )}
     </div>
   )

@@ -136,7 +136,9 @@ export function registerIpcHandlers(window: BrowserWindow): void {
           company: req.company,
           jobDescription: req.jobDescription,
           extraContext: req.extraContext,
-          answerPreferences: req.answerPreferences
+          answerPreferences: req.answerPreferences,
+          followUpInstruction: req.followUpInstruction,
+          priorAnswer: req.priorAnswer
         },
         (delta) => safeSend(window.webContents, IPC_CHANNELS.aiChunk, { cardId: req.cardId, delta })
       ).then(

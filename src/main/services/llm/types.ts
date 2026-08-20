@@ -2,6 +2,15 @@ import type { AnswerPreferences } from '../../../shared/session-types'
 
 export type LlmProvider = 'gemini' | 'openai' | 'opencode-go' | 'opencode-zen' | 'deepseek'
 
+export interface PriorAnswerSummary {
+  answer: string
+  keySteps?: string[]
+  code?: { language: string; content: string }
+  explanation?: string
+  timeComplexity?: string
+  spaceComplexity?: string
+}
+
 export interface AskParams {
   apiKey: string
   model: string
@@ -10,6 +19,14 @@ export interface AskParams {
   jobDescription?: string
   extraContext?: string
   answerPreferences?: AnswerPreferences
+  /** Present only for a follow-up ask — the current best-known answer to
+   *  `question`, given as context so the model knows what a short follow-up
+   *  instruction like "add code for this" refers to. */
+  priorAnswer?: PriorAnswerSummary
+  /** Present only for a follow-up ask — the new/additional thing being asked
+   *  about the same question. When set, buildPrompt returns a follow-up
+   *  prompt instead of a fresh-question prompt. */
+  followUpInstruction?: string
 }
 
 /**
@@ -45,6 +62,10 @@ Space: O(...)
 (omit this section if not applicable)`
 
 export function buildPrompt(params: AskParams): string {
+  if (params.priorAnswer && params.followUpInstruction) {
+    return buildFollowUpPrompt(params.priorAnswer, params.followUpInstruction, params)
+  }
+
   const contextLines = [
     params.company ? `Company: ${params.company}` : null,
     params.jobDescription ? `Job description: ${params.jobDescription}` : null,
@@ -67,6 +88,28 @@ export function buildPrompt(params: AskParams): string {
     contextLines.length > 0 ? contextLines.join('\n') : null,
     prefLines.length > 0 ? prefLines.join(' ') : null,
     `Question: ${params.question}`,
+    RESPONSE_FORMAT_INSTRUCTIONS
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+}
+
+function buildFollowUpPrompt(prior: PriorAnswerSummary, instruction: string, params: AskParams): string {
+  const priorSummaryLines = [
+    `Answer: ${prior.answer}`,
+    prior.keySteps?.length ? `Key steps: ${prior.keySteps.join('; ')}` : null,
+    prior.code ? `Code (${prior.code.language}):\n${prior.code.content}` : null,
+    prior.explanation ? `Explanation: ${prior.explanation}` : null,
+    prior.timeComplexity ? `Time complexity: ${prior.timeComplexity}` : null,
+    prior.spaceComplexity ? `Space complexity: ${prior.spaceComplexity}` : null
+  ].filter(Boolean)
+
+  return [
+    'You are answering as the candidate, in first person, in an interview or meeting. You already gave an answer to this question, and the candidate now wants to add something to it.',
+    `Original question: ${params.question}`,
+    `Your existing answer so far:\n${priorSummaryLines.join('\n')}`,
+    `Additional request: ${instruction}`,
+    "Respond with ONLY the new or updated sections needed to satisfy the additional request — do not repeat the full original answer.",
     RESPONSE_FORMAT_INSTRUCTIONS
   ]
     .filter(Boolean)

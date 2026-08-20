@@ -50,6 +50,15 @@ export const sessionMetadataSchema = z.object({
   updatedAt: z.string()
 })
 
+const priorAnswerSchema = z.object({
+  answer: z.string(),
+  keySteps: z.array(z.string()).optional(),
+  code: z.object({ language: z.string(), content: z.string() }).optional(),
+  explanation: z.string().optional(),
+  timeComplexity: z.string().optional(),
+  spaceComplexity: z.string().optional()
+})
+
 export const askAiRequestSchema = z.object({
   cardId: z.string().min(1),
   question: z.string().min(1, 'Question cannot be empty'),
@@ -58,7 +67,9 @@ export const askAiRequestSchema = z.object({
   company: z.string().optional(),
   jobDescription: z.string().optional(),
   extraContext: z.string().optional(),
-  answerPreferences: answerPreferencesSchema.optional()
+  answerPreferences: answerPreferencesSchema.optional(),
+  followUpInstruction: z.string().min(1).optional(),
+  priorAnswer: priorAnswerSchema.optional()
 })
 
 export const answerResultSchema = z.object({

@@ -8,6 +8,17 @@ export interface TranscriptMessage {
   timestamp: number
 }
 
+export interface FollowUpEntry {
+  instruction: string
+  answer: string
+  keySteps?: string[]
+  code?: { language: string; content: string }
+  explanation?: string
+  timeComplexity?: string
+  spaceComplexity?: string
+  createdAt: number
+}
+
 export interface AnswerCard {
   id: string
   question: string
@@ -18,6 +29,16 @@ export interface AnswerCard {
   explanation?: string
   timeComplexity?: string
   spaceComplexity?: string
+  /** Additional targeted asks appended after the primary answer (e.g. "+ Code",
+   *  "explain more") — kept separate from the primary fields above so a
+   *  follow-up never silently overwrites the original answer. */
+  followUps?: FollowUpEntry[]
+  /** A follow-up currently streaming in — shown live below the primary
+   *  content, then moved into followUps (or promoted into the primary code
+   *  field) once done. Distinct from `status`, which tracks the primary
+   *  answer only, so a follow-up in flight never flips the card back to a
+   *  "streaming" primary-answer state. */
+  pendingFollowUp?: Omit<FollowUpEntry, 'createdAt'>
   status: 'streaming' | 'done' | 'error'
   createdAt: number
 }

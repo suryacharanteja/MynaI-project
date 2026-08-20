@@ -60,6 +60,15 @@ export interface SessionSummary {
   updatedAt: string
 }
 
+export interface PriorAnswerPayload {
+  answer: string
+  keySteps?: string[]
+  code?: { language: string; content: string }
+  explanation?: string
+  timeComplexity?: string
+  spaceComplexity?: string
+}
+
 export interface AskAiRequest {
   cardId: string
   question: string
@@ -69,6 +78,9 @@ export interface AskAiRequest {
   jobDescription?: string
   extraContext?: string
   answerPreferences?: AnswerPreferences
+  /** Set only for a follow-up ask on an existing card — see priorAnswer. */
+  followUpInstruction?: string
+  priorAnswer?: PriorAnswerPayload
 }
 
 export interface AskAiStartResult {
