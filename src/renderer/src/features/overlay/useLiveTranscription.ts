@@ -95,6 +95,16 @@ export function useLiveTranscription() {
           systemAutoRetriedRef.current = false
           setSystemAudioIssue(false)
         }
+      },
+      (source: AudioSource) => {
+        // Fast path: the underlying track died (see capture.ts). Back-date
+        // the "listening since" clock so the watchdog's very next tick
+        // (~5s) treats this exactly like the 40s-silence case it already
+        // knows how to recover from, instead of duplicating that logic here.
+        if (source === 'system') {
+          systemListeningSinceRef.current = Date.now() - SYSTEM_SILENCE_THRESHOLD_MS - 1
+          lastSystemSignalAtRef.current = 0
+        }
       }
     )
   )
@@ -338,7 +348,16 @@ export function useLiveTranscription() {
         capture
           .stopSystem()
           .then(() => capture.startSystem())
-          .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+          .catch((err) => {
+            // If the retry itself fails, systemListeningSinceRef is now null
+            // (set by the status handler when it left 'listening'), which
+            // makes the watchdog interval a permanent no-op from here on —
+            // so this is the ONLY chance to give the user a way back in.
+            // Missing this is exactly what left the app "not taking
+            // interviewer input" with no visible way to recover.
+            setSystemAudioIssue(true)
+            setError(err instanceof Error ? err.message : String(err))
+          })
       } else {
         setSystemAudioIssue(true)
         setError(
@@ -387,6 +406,10 @@ export function useLiveTranscription() {
       await captureRef.current.stopSystem()
       await captureRef.current.startSystem()
     } catch (err) {
+      // Same failure mode as the auto-retry above: without restoring
+      // systemAudioIssue here, a second failed manual click makes the Retry
+      // button itself disappear, leaving no way to try again at all.
+      setSystemAudioIssue(true)
       setError(err instanceof Error ? err.message : String(err))
     }
   }

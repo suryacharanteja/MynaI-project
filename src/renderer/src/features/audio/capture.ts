@@ -11,7 +11,8 @@ interface SourceRuntime {
 
 export function createAudioCapture(
   onMonitorLog?: (level: string, code: string, message: string) => void,
-  onLevel?: (source: AudioSource, level: number) => void
+  onLevel?: (source: AudioSource, level: number) => void,
+  onTrackEnded?: (source: AudioSource) => void
 ) {
   const runtime: Record<AudioSource, SourceRuntime> = {
     mic: { context: null, stream: null, processor: null, active: false, queue: Promise.resolve() },
@@ -86,6 +87,17 @@ export function createAudioCapture(
       throw new Error(`Desktop capture fell back to a camera source (${videoTrack.label || 'unknown'}).`)
     }
     stream.getVideoTracks().forEach((track) => track.stop())
+
+    // 'active'/runtime state doesn't reflect the underlying track dying —
+    // Windows/Chromium can tear down a loopback session mid-call (source
+    // window closed, audio device changed, OS revokes it) without the app
+    // doing anything wrong. Without this, the only way to notice was
+    // inferring it from up to 40s of silence via the RMS watchdog. Listening
+    // directly cuts that to the watchdog's next ~5s tick.
+    stream.getAudioTracks()[0]?.addEventListener('ended', () => {
+      runtime.system.active = false
+      onTrackEnded?.('system')
+    })
 
     const context = new AudioContext()
     await context.resume()

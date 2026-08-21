@@ -48,6 +48,20 @@ const MIN_WORDS_FOR_QUESTION = 3
 // real task verb out of startsWith() range.
 const FILLER_LEADS = ['so', 'now', 'okay', 'ok', 'alright', 'well', 'um', 'umm', 'uh', 'uhh', 'right', 'also', 'and']
 
+/**
+ * Counts words that aren't filler ("so", "uh"...) — raw word count let a
+ * filler-padded fragment like "So, uh, when?" (3 raw words, 1 real word)
+ * clear the MIN_WORDS_FOR_QUESTION floor and get dispatched as if it were a
+ * complete question, even though "when" alone has nothing to answer.
+ */
+function countContentWords(text: string): number {
+  return text
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((word) => !FILLER_LEADS.includes(word.toLowerCase().replace(/[^a-z]/g, '')))
+    .length
+}
+
 function splitIntoClauses(text: string): string[] {
   return text
     .split(/[.!?;]+|,/g)
@@ -80,11 +94,12 @@ export function isLikelyQuestion(text: string): boolean {
   const trimmed = text.trim()
   if (trimmed.length === 0) return false
 
-  const wordCount = trimmed.split(/\s+/).filter(Boolean).length
+  const contentWordCount = countContentWords(trimmed)
 
-  // A "?" anywhere in the text is a strong signal — but require at least 3 words
-  // to avoid false positives on fragments like "?" or "huh?"
-  if (trimmed.includes('?') && wordCount >= MIN_WORDS_FOR_QUESTION) return true
+  // A "?" anywhere in the text is a strong signal — but require at least 3
+  // CONTENT words (fillers don't count) to avoid false positives on
+  // fragments like "?", "huh?", or "So, uh, when?" (3 raw words, 1 real one).
+  if (trimmed.includes('?') && contentWordCount >= MIN_WORDS_FOR_QUESTION) return true
 
   // Same floor applies to the starter/verb clause matches below. Without it, a
   // lone fragment like "How" — the whole buffer, if the interviewer paused
@@ -93,7 +108,7 @@ export function isLikelyQuestion(text: string): boolean {
   // answer. The floor is checked against the WHOLE buffer (the unit that
   // actually gets dispatched), not the individual clause, so a real question
   // still matches immediately once enough of it has arrived.
-  if (wordCount < MIN_WORDS_FOR_QUESTION) return false
+  if (contentWordCount < MIN_WORDS_FOR_QUESTION) return false
 
   for (const clause of splitIntoClauses(trimmed)) {
     const head = stripFillerLead(clause).toLowerCase()
