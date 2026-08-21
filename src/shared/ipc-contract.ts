@@ -30,7 +30,8 @@ export const SHORTCUT_IDS = [
   'follow-up-code',
   'follow-up-detail',
   'follow-up-complexity',
-  'follow-up-voice'
+  'follow-up-voice',
+  'reask-relisten'
 ] as const
 export type ShortcutId = (typeof SHORTCUT_IDS)[number]
 

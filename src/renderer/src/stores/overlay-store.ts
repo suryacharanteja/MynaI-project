@@ -13,6 +13,9 @@ interface OverlayStore {
   /** cardId currently armed to receive the next mic utterance as a voice
    *  follow-up instruction, or null when not armed. */
   voiceFollowUpCardId: string | null
+  /** cardId currently armed to capture the interviewer repeating the
+   *  question (system audio) and regenerate from it, or null when not armed. */
+  reCaptureCardId: string | null
 
   addTranscriptMessage: (message: TranscriptMessage) => void
   setPartialText: (source: 'mic' | 'system', text: string) => void
@@ -26,6 +29,7 @@ interface OverlayStore {
   setQuestionDetected: (detected: boolean) => void
   setMicLevel: (level: number) => void
   setVoiceFollowUpCardId: (cardId: string | null) => void
+  setReCaptureCardId: (cardId: string | null) => void
 }
 
 export const useOverlayStore = create<OverlayStore>((set, get) => ({
@@ -38,6 +42,7 @@ export const useOverlayStore = create<OverlayStore>((set, get) => ({
   questionDetected: false,
   micLevel: 0,
   voiceFollowUpCardId: null,
+  reCaptureCardId: null,
 
   addTranscriptMessage: (message) =>
     set((state) => ({ transcript: [...state.transcript.slice(-49), message] })),
@@ -80,5 +85,6 @@ export const useOverlayStore = create<OverlayStore>((set, get) => ({
   setAutoAnswerOn: (autoAnswerOn) => set({ autoAnswerOn }),
   setQuestionDetected: (questionDetected) => set({ questionDetected }),
   setMicLevel: (micLevel) => set({ micLevel }),
-  setVoiceFollowUpCardId: (voiceFollowUpCardId) => set({ voiceFollowUpCardId })
+  setVoiceFollowUpCardId: (voiceFollowUpCardId) => set({ voiceFollowUpCardId }),
+  setReCaptureCardId: (reCaptureCardId) => set({ reCaptureCardId })
 }))

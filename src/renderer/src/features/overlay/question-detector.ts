@@ -86,6 +86,15 @@ export function isLikelyQuestion(text: string): boolean {
   // to avoid false positives on fragments like "?" or "huh?"
   if (trimmed.includes('?') && wordCount >= MIN_WORDS_FOR_QUESTION) return true
 
+  // Same floor applies to the starter/verb clause matches below. Without it, a
+  // lone fragment like "How" — the whole buffer, if the interviewer paused
+  // right after starting a sentence — satisfied startsWith('how') instantly
+  // and got dispatched as a "complete" question with nothing to actually
+  // answer. The floor is checked against the WHOLE buffer (the unit that
+  // actually gets dispatched), not the individual clause, so a real question
+  // still matches immediately once enough of it has arrived.
+  if (wordCount < MIN_WORDS_FOR_QUESTION) return false
+
   for (const clause of splitIntoClauses(trimmed)) {
     const head = stripFillerLead(clause).toLowerCase()
     if (!head) continue

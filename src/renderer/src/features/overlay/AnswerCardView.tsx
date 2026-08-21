@@ -9,9 +9,9 @@ import {
   Database,
   Copy,
   Check,
-  Pencil,
   Plus,
   Mic,
+  Repeat,
   X
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -63,11 +63,16 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
   const [followUpBusy, setFollowUpBusy] = useState(false)
   const voiceFollowUpCardId = useOverlayStore((s) => s.voiceFollowUpCardId)
   const setVoiceFollowUpCardId = useOverlayStore((s) => s.setVoiceFollowUpCardId)
+  const reCaptureCardId = useOverlayStore((s) => s.reCaptureCardId)
+  const setReCaptureCardId = useOverlayStore((s) => s.setReCaptureCardId)
   const micStatus = useOverlayStore((s) => s.sttStatus.mic)
+  const systemStatus = useOverlayStore((s) => s.sttStatus.system)
 
   const busy = card.status === 'streaming' || followUpBusy
   const voiceArmedForThisCard = voiceFollowUpCardId === card.id
+  const reCaptureArmedForThisCard = reCaptureCardId === card.id
   const micReady = micStatus === 'listening'
+  const systemReady = systemStatus === 'listening'
 
   async function sendFollowUp(instruction: string): Promise<void> {
     if (!instruction.trim() || busy) return
@@ -79,6 +84,11 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
   function toggleVoiceFollowUp(): void {
     if (busy) return
     setVoiceFollowUpCardId(voiceArmedForThisCard ? null : card.id)
+  }
+
+  function toggleReCapture(): void {
+    if (busy) return
+    setReCaptureCardId(reCaptureArmedForThisCard ? null : card.id)
   }
 
   // Global shortcuts fire from the main process regardless of window focus —
@@ -93,10 +103,12 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
         sendFollowUp(chip.instruction)
       } else if (id === 'follow-up-voice') {
         toggleVoiceFollowUp()
+      } else if (id === 'reask-relisten') {
+        toggleReCapture()
       }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [card.id, card.status, followUpBusy, voiceFollowUpCardId, micStatus])
+  }, [card.id, card.status, followUpBusy, voiceFollowUpCardId, reCaptureCardId, micStatus, systemStatus])
 
   async function handleCopy(): Promise<void> {
     const parts = [card.answer]
@@ -159,18 +171,56 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
               </div>
             </div>
           ) : (
-            <div className="group flex items-start gap-1.5">
+            <div className="space-y-1">
               <p className="text-sm text-neutral-300">{card.question}</p>
-              <button
-                onClick={() => {
-                  setQuestionDraft(card.question)
-                  setEditingQuestion(true)
-                }}
-                title="Question captured wrong? Edit and re-ask"
-                className="mt-0.5 shrink-0 rounded p-0.5 text-neutral-600 opacity-0 transition hover:text-neutral-300 group-hover:opacity-100"
-              >
-                <Pencil size={11} />
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Primary correction path: no typing. Arms system-audio
+                    capture of the interviewer repeating the question — the
+                    natural "can you repeat that?" is already normal
+                    interview behavior, unlike typing into an unknown window. */}
+                <button
+                  onClick={toggleReCapture}
+                  disabled={busy || (!systemReady && !reCaptureArmedForThisCard)}
+                  title={
+                    reCaptureArmedForThisCard
+                      ? 'Listening — click to cancel'
+                      : systemReady
+                        ? 'Question captured wrong? Ask the interviewer to repeat it, then press this (Alt+Shift+R)'
+                        : 'Waiting for system audio to connect'
+                  }
+                  className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition disabled:opacity-40 ${
+                    reCaptureArmedForThisCard
+                      ? 'bg-red-500/20 text-red-300'
+                      : 'bg-white/5 text-neutral-400 hover:bg-white/15 hover:text-neutral-200'
+                  }`}
+                >
+                  {reCaptureArmedForThisCard ? (
+                    <>
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-400" />
+                      Listening for repeat…
+                      <X size={10} />
+                    </>
+                  ) : (
+                    <>
+                      <Repeat size={10} />
+                      Re-listen
+                      <span className="text-neutral-600">Alt+Shift+R</span>
+                    </>
+                  )}
+                </button>
+                {/* Fallback for when the interviewer can't be asked to repeat
+                    (e.g. they've moved on) — typed correction, kept but demoted. */}
+                <button
+                  onClick={() => {
+                    setQuestionDraft(card.question)
+                    setEditingQuestion(true)
+                  }}
+                  title="Fallback: type the correct question yourself"
+                  className="text-[10px] text-neutral-600 underline decoration-dotted transition hover:text-neutral-400"
+                >
+                  Edit manually
+                </button>
+              </div>
             </div>
           )}
         </Section>

@@ -12,7 +12,8 @@ const BINDINGS: { accelerator: string; id: ShortcutId }[] = [
   { accelerator: 'Alt+Shift+C', id: 'follow-up-code' },
   { accelerator: 'Alt+Shift+D', id: 'follow-up-detail' },
   { accelerator: 'Alt+Shift+X', id: 'follow-up-complexity' },
-  { accelerator: 'Alt+Shift+V', id: 'follow-up-voice' }
+  { accelerator: 'Alt+Shift+V', id: 'follow-up-voice' },
+  { accelerator: 'Alt+Shift+R', id: 'reask-relisten' }
 ]
 
 export function registerGlobalShortcuts(window: BrowserWindow): void {

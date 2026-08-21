@@ -4,7 +4,7 @@ import type { AudioSource } from '../audio/source-state'
 import { useOverlayStore } from '../../stores/overlay-store'
 import { useSessionStore } from '../../stores/session-store'
 import { isLikelyQuestion, isDuplicateQuestion, isLikelyGarbledTranscript } from './question-detector'
-import { askAiAndAddCard, askFollowUp } from './ask-ai'
+import { askAiAndAddCard, askFollowUp, reAskCard } from './ask-ai'
 
 const AUTO_ANSWER_COOLDOWN_MS = 1200
 const QUESTION_DETECTED_PULSE_MS = 2500
@@ -43,6 +43,11 @@ const VOICE_FOLLOWUP_SILENCE_MS = 1800
 /** If nothing is said at all within this long after arming, auto-cancel
  *  rather than leaving voice follow-up armed indefinitely. */
 const VOICE_FOLLOWUP_ARM_TIMEOUT_MS = 10000
+/** Re-listen: same silence-debounce/arm-timeout shape as voice follow-up,
+ *  but listening on system audio (the interviewer repeating the question)
+ *  instead of the candidate's own mic. */
+const RECAPTURE_SILENCE_MS = 1800
+const RECAPTURE_ARM_TIMEOUT_MS = 10000
 /**
  * "Connected" (sttStatus === 'listening') only means the WebSocket handshake
  * succeeded — it says nothing about whether the audio track underneath is
@@ -100,6 +105,9 @@ export function useLiveTranscription() {
   const voiceFollowUpBufferRef = useRef<RecentTurn[]>([])
   const voiceFollowUpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const voiceFollowUpArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reCaptureBufferRef = useRef<RecentTurn[]>([])
+  const reCaptureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reCaptureArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const capture = captureRef.current
@@ -188,6 +196,55 @@ export function useLiveTranscription() {
       }
     })
 
+    function clearReCaptureTimers(): void {
+      if (reCaptureTimerRef.current) {
+        clearTimeout(reCaptureTimerRef.current)
+        reCaptureTimerRef.current = null
+      }
+      if (reCaptureArmTimerRef.current) {
+        clearTimeout(reCaptureArmTimerRef.current)
+        reCaptureArmTimerRef.current = null
+      }
+    }
+
+    function finalizeReCapture(): void {
+      clearReCaptureTimers()
+      const turns = reCaptureBufferRef.current
+      reCaptureBufferRef.current = []
+      const { reCaptureCardId, setReCaptureCardId } = useOverlayStore.getState()
+      setReCaptureCardId(null)
+      if (!reCaptureCardId || turns.length === 0) return
+
+      const capturedQuestion = turns.map((t) => t.text).join(' ').trim()
+      if (!capturedQuestion) return
+
+      const { form } = useSessionStore.getState()
+      reAskCard(reCaptureCardId, capturedQuestion, form)
+    }
+
+    // Same arm-watcher shape as voice follow-up above, mirrored for
+    // re-capture — starts the "nothing was said at all" safety timeout the
+    // moment a card arms Re-listen (AnswerCardView calling
+    // setReCaptureCardId), since the system-turn handler below only knows
+    // about turns that actually arrive.
+    const unsubReCaptureArm = useOverlayStore.subscribe((state, prev) => {
+      if (state.reCaptureCardId && state.reCaptureCardId !== prev.reCaptureCardId) {
+        reCaptureBufferRef.current = []
+        if (reCaptureArmTimerRef.current) clearTimeout(reCaptureArmTimerRef.current)
+        reCaptureArmTimerRef.current = setTimeout(() => {
+          if (
+            useOverlayStore.getState().reCaptureCardId === state.reCaptureCardId &&
+            reCaptureBufferRef.current.length === 0
+          ) {
+            useOverlayStore.getState().setReCaptureCardId(null)
+          }
+        }, RECAPTURE_ARM_TIMEOUT_MS)
+      } else if (!state.reCaptureCardId && prev.reCaptureCardId) {
+        clearReCaptureTimers()
+        reCaptureBufferRef.current = []
+      }
+    })
+
     const unsubStatus = window.mynai.onSttStatus((e) => {
       setSttStatus(e.source, e.status)
       if (e.status === 'listening') {
@@ -224,6 +281,19 @@ export function useLiveTranscription() {
         voiceFollowUpBufferRef.current.push({ text: e.text, timestamp: Date.now() })
         if (voiceFollowUpTimerRef.current) clearTimeout(voiceFollowUpTimerRef.current)
         voiceFollowUpTimerRef.current = setTimeout(finalizeVoiceFollowUp, VOICE_FOLLOWUP_SILENCE_MS)
+      }
+
+      // Re-listen: while a card has Re-listen armed, redirect system-audio
+      // turns (the interviewer's voice) into the re-capture buffer INSTEAD
+      // of the normal auto-answer path below — the early return is load
+      // bearing. Without it, the interviewer repeating the question on
+      // request would also feed the normal detector and spawn an unrelated
+      // duplicate card at the same time as the targeted card regenerates.
+      if (e.source === 'system' && useOverlayStore.getState().reCaptureCardId) {
+        reCaptureBufferRef.current.push({ text: e.text, timestamp: Date.now() })
+        if (reCaptureTimerRef.current) clearTimeout(reCaptureTimerRef.current)
+        reCaptureTimerRef.current = setTimeout(finalizeReCapture, RECAPTURE_SILENCE_MS)
+        return
       }
 
       // Question detection only runs on the "system" stream (the call's shared/output
@@ -282,8 +352,10 @@ export function useLiveTranscription() {
     return () => {
       clearSilenceTimer()
       clearVoiceFollowUpTimers()
+      clearReCaptureTimers()
       clearInterval(silenceWatchdog)
       unsubVoiceArm()
+      unsubReCaptureArm()
       unsubStatus()
       unsubPartial()
       unsubFinal()
