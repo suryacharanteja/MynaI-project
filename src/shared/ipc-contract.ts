@@ -22,8 +22,17 @@ export const IPC_CHANNELS = {
   sttError: 'stt:error',
   windowMinimize: 'window:minimize',
   windowRestore: 'window:restore',
-  windowClose: 'window:close'
+  windowClose: 'window:close',
+  shortcutTriggered: 'shortcut:triggered'
 } as const
+
+export const SHORTCUT_IDS = [
+  'follow-up-code',
+  'follow-up-detail',
+  'follow-up-complexity',
+  'follow-up-voice'
+] as const
+export type ShortcutId = (typeof SHORTCUT_IDS)[number]
 
 export interface AppSettings {
   geminiApiKey: string | null
@@ -110,6 +119,10 @@ export interface SttStartResult {
   error?: string
 }
 
+export interface ShortcutTriggeredEvent {
+  id: ShortcutId
+}
+
 export interface MynaiApi {
   getSettings: () => Promise<AppSettings>
   setSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>
@@ -131,4 +144,6 @@ export interface MynaiApi {
   windowMinimize: () => void
   windowRestore: () => void
   windowClose: () => void
+
+  onShortcutTriggered: (callback: (event: ShortcutTriggeredEvent) => void) => () => void
 }

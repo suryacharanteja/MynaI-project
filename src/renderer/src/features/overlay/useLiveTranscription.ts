@@ -3,7 +3,7 @@ import { createAudioCapture } from '../audio/capture'
 import { useOverlayStore } from '../../stores/overlay-store'
 import { useSessionStore } from '../../stores/session-store'
 import { isLikelyQuestion, isDuplicateQuestion, isLikelyGarbledTranscript } from './question-detector'
-import { askAiAndAddCard } from './ask-ai'
+import { askAiAndAddCard, askFollowUp } from './ask-ai'
 
 const AUTO_ANSWER_COOLDOWN_MS = 1200
 const QUESTION_DETECTED_PULSE_MS = 2500
@@ -35,6 +35,13 @@ const SILENCE_DEBOUNCE_NO_QUESTION_MARK_MS = 3200
  *  than the debounce, don't wait forever — force an evaluation once the
  *  buffer has been accumulating this long. */
 const MAX_BUFFER_MS = 45000
+/** Voice follow-up: same silence-debounce idea as the auto-answer buffer
+ *  above, but scoped to the user's own mic and much shorter — a follow-up
+ *  instruction is a short, deliberate aside, not a multi-clause prompt. */
+const VOICE_FOLLOWUP_SILENCE_MS = 1800
+/** If nothing is said at all within this long after arming, auto-cancel
+ *  rather than leaving voice follow-up armed indefinitely. */
+const VOICE_FOLLOWUP_ARM_TIMEOUT_MS = 10000
 
 interface RecentTurn {
   text: string
@@ -53,6 +60,9 @@ export function useLiveTranscription() {
   const recentQuestionsRef = useRef<string[]>([])
   const bufferRef = useRef<RecentTurn[]>([])
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const voiceFollowUpBufferRef = useRef<RecentTurn[]>([])
+  const voiceFollowUpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const voiceFollowUpArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const capture = captureRef.current
@@ -90,6 +100,57 @@ export function useLiveTranscription() {
       askAiAndAddCard(combinedText, form)
     }
 
+    function clearVoiceFollowUpTimers(): void {
+      if (voiceFollowUpTimerRef.current) {
+        clearTimeout(voiceFollowUpTimerRef.current)
+        voiceFollowUpTimerRef.current = null
+      }
+      if (voiceFollowUpArmTimerRef.current) {
+        clearTimeout(voiceFollowUpArmTimerRef.current)
+        voiceFollowUpArmTimerRef.current = null
+      }
+    }
+
+    function finalizeVoiceFollowUp(): void {
+      clearVoiceFollowUpTimers()
+      const turns = voiceFollowUpBufferRef.current
+      voiceFollowUpBufferRef.current = []
+      const { voiceFollowUpCardId, setVoiceFollowUpCardId } = useOverlayStore.getState()
+      setVoiceFollowUpCardId(null)
+      if (!voiceFollowUpCardId || turns.length === 0) return
+
+      const instruction = turns.map((t) => t.text).join(' ').trim()
+      if (!instruction) return
+
+      const { form } = useSessionStore.getState()
+      askFollowUp(voiceFollowUpCardId, instruction, form)
+    }
+
+    // Watches for a card arming voice follow-up (AnswerCardView calling
+    // setVoiceFollowUpCardId) and starts the "nothing was said at all"
+    // safety timeout right at that moment — the mic-turn handler below only
+    // knows about turns that actually arrive, so it can't detect silence on
+    // its own if the user never speaks after arming.
+    const unsubVoiceArm = useOverlayStore.subscribe((state, prev) => {
+      if (state.voiceFollowUpCardId && state.voiceFollowUpCardId !== prev.voiceFollowUpCardId) {
+        voiceFollowUpBufferRef.current = []
+        if (voiceFollowUpArmTimerRef.current) clearTimeout(voiceFollowUpArmTimerRef.current)
+        voiceFollowUpArmTimerRef.current = setTimeout(() => {
+          if (
+            useOverlayStore.getState().voiceFollowUpCardId === state.voiceFollowUpCardId &&
+            voiceFollowUpBufferRef.current.length === 0
+          ) {
+            useOverlayStore.getState().setVoiceFollowUpCardId(null)
+          }
+        }, VOICE_FOLLOWUP_ARM_TIMEOUT_MS)
+      } else if (!state.voiceFollowUpCardId && prev.voiceFollowUpCardId) {
+        // Cancelled externally (e.g. the card's cancel button) — drop any
+        // partial capture rather than finalizing it.
+        clearVoiceFollowUpTimers()
+        voiceFollowUpBufferRef.current = []
+      }
+    })
+
     const unsubStatus = window.mynai.onSttStatus((e) => {
       setSttStatus(e.source, e.status)
       if (e.status === 'listening') setError(null)
@@ -111,6 +172,17 @@ export function useLiveTranscription() {
         isFinal: true,
         timestamp: Date.now()
       })
+
+      // Voice follow-up: while a card has arming enabled (user pressed "Speak"
+      // or its shortcut), redirect the candidate's own mic speech into that
+      // card's follow-up instruction instead of treating it as ordinary
+      // transcript. Scoped and bounded — only active between arming and the
+      // silence-debounce finalize (or explicit cancel) below.
+      if (e.source === 'mic' && useOverlayStore.getState().voiceFollowUpCardId) {
+        voiceFollowUpBufferRef.current.push({ text: e.text, timestamp: Date.now() })
+        if (voiceFollowUpTimerRef.current) clearTimeout(voiceFollowUpTimerRef.current)
+        voiceFollowUpTimerRef.current = setTimeout(finalizeVoiceFollowUp, VOICE_FOLLOWUP_SILENCE_MS)
+      }
 
       // Question detection only runs on the "system" stream (the call's shared/output
       // audio — the interviewer and other participants). The "mic" stream is the user's
@@ -138,6 +210,8 @@ export function useLiveTranscription() {
 
     return () => {
       clearSilenceTimer()
+      clearVoiceFollowUpTimers()
+      unsubVoiceArm()
       unsubStatus()
       unsubPartial()
       unsubFinal()

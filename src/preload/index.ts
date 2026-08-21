@@ -6,6 +6,7 @@ import {
   type AskAiChunkEvent,
   type AskAiDoneEvent,
   type AskAiErrorEvent,
+  type ShortcutTriggeredEvent,
   type MynaiApi
 } from '../shared/ipc-contract'
 import type { CreateSessionForm } from '../shared/session-types'
@@ -39,7 +40,10 @@ const api: MynaiApi = {
 
   windowMinimize: () => ipcRenderer.send(IPC_CHANNELS.windowMinimize),
   windowRestore: () => ipcRenderer.send(IPC_CHANNELS.windowRestore),
-  windowClose: () => ipcRenderer.send(IPC_CHANNELS.windowClose)
+  windowClose: () => ipcRenderer.send(IPC_CHANNELS.windowClose),
+
+  onShortcutTriggered: (callback: (event: ShortcutTriggeredEvent) => void) =>
+    subscribe(IPC_CHANNELS.shortcutTriggered, callback)
 }
 
 contextBridge.exposeInMainWorld('mynai', api)

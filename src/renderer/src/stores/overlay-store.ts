@@ -10,6 +10,9 @@ interface OverlayStore {
   autoAnswerOn: boolean
   questionDetected: boolean
   micLevel: number
+  /** cardId currently armed to receive the next mic utterance as a voice
+   *  follow-up instruction, or null when not armed. */
+  voiceFollowUpCardId: string | null
 
   addTranscriptMessage: (message: TranscriptMessage) => void
   setPartialText: (source: 'mic' | 'system', text: string) => void
@@ -22,6 +25,7 @@ interface OverlayStore {
   setAutoAnswerOn: (on: boolean) => void
   setQuestionDetected: (detected: boolean) => void
   setMicLevel: (level: number) => void
+  setVoiceFollowUpCardId: (cardId: string | null) => void
 }
 
 export const useOverlayStore = create<OverlayStore>((set, get) => ({
@@ -33,6 +37,7 @@ export const useOverlayStore = create<OverlayStore>((set, get) => ({
   autoAnswerOn: true,
   questionDetected: false,
   micLevel: 0,
+  voiceFollowUpCardId: null,
 
   addTranscriptMessage: (message) =>
     set((state) => ({ transcript: [...state.transcript.slice(-49), message] })),
@@ -74,5 +79,6 @@ export const useOverlayStore = create<OverlayStore>((set, get) => ({
 
   setAutoAnswerOn: (autoAnswerOn) => set({ autoAnswerOn }),
   setQuestionDetected: (questionDetected) => set({ questionDetected }),
-  setMicLevel: (micLevel) => set({ micLevel })
+  setMicLevel: (micLevel) => set({ micLevel }),
+  setVoiceFollowUpCardId: (voiceFollowUpCardId) => set({ voiceFollowUpCardId })
 }))

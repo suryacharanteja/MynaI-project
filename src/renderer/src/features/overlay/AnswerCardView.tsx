@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   MessageCircle,
   Star,
@@ -11,19 +11,40 @@ import {
   Check,
   Pencil,
   Plus,
-  Send,
-  Loader2
+  Mic,
+  X
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { AnswerCard, FollowUpEntry } from '@shared/transcript-types'
+import type { ShortcutId } from '@shared/ipc-contract'
 import { MarkdownLite } from './MarkdownLite'
 import { useSessionStore } from '../../stores/session-store'
+import { useOverlayStore } from '../../stores/overlay-store'
 import { reAskCard, askFollowUp } from './ask-ai'
 
-const FOLLOW_UP_CHIPS = [
-  { label: '+ Code', instruction: 'Add the code for this.' },
-  { label: '+ More detail', instruction: 'Give more detail on this answer.' },
-  { label: '+ Complexity', instruction: 'Add the time and space complexity for this.' }
+/**
+ * No free-text box here on purpose: typing a sentence into a floating window
+ * mid-interview is a visible behavioral tell even though the overlay's
+ * content itself is hidden from screen capture. These canned asks cover the
+ * realistic set of things someone wants appended, each reachable via a
+ * single click OR a silent global shortcut that needs no mouse movement away
+ * from the shared coding editor at all. Anything open-ended goes through
+ * voice instead (the Speak chip below) rather than typing.
+ */
+const FOLLOW_UP_CHIPS: { label: string; instruction: string; shortcutId: ShortcutId; hint: string }[] = [
+  { label: '+ Code', instruction: 'Add the code for this.', shortcutId: 'follow-up-code', hint: 'Alt+Shift+C' },
+  {
+    label: '+ More detail',
+    instruction: 'Give more detail on this answer.',
+    shortcutId: 'follow-up-detail',
+    hint: 'Alt+Shift+D'
+  },
+  {
+    label: '+ Complexity',
+    instruction: 'Add the time and space complexity for this.',
+    shortcutId: 'follow-up-complexity',
+    hint: 'Alt+Shift+X'
+  }
 ]
 
 interface AnswerBody {
@@ -39,10 +60,43 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
   const [copied, setCopied] = useState(false)
   const [editingQuestion, setEditingQuestion] = useState(false)
   const [questionDraft, setQuestionDraft] = useState(card.question)
-  const [followUpText, setFollowUpText] = useState('')
   const [followUpBusy, setFollowUpBusy] = useState(false)
+  const voiceFollowUpCardId = useOverlayStore((s) => s.voiceFollowUpCardId)
+  const setVoiceFollowUpCardId = useOverlayStore((s) => s.setVoiceFollowUpCardId)
+  const micStatus = useOverlayStore((s) => s.sttStatus.mic)
 
   const busy = card.status === 'streaming' || followUpBusy
+  const voiceArmedForThisCard = voiceFollowUpCardId === card.id
+  const micReady = micStatus === 'listening'
+
+  async function sendFollowUp(instruction: string): Promise<void> {
+    if (!instruction.trim() || busy) return
+    setFollowUpBusy(true)
+    await askFollowUp(card.id, instruction.trim(), useSessionStore.getState().form)
+    setFollowUpBusy(false)
+  }
+
+  function toggleVoiceFollowUp(): void {
+    if (busy) return
+    setVoiceFollowUpCardId(voiceArmedForThisCard ? null : card.id)
+  }
+
+  // Global shortcuts fire from the main process regardless of window focus —
+  // the whole point is triggering a follow-up without touching the mouse or
+  // switching focus away from the shared coding editor. AnswerCardStack only
+  // ever mounts the currently-active card, so this naturally scopes shortcut
+  // handling to whichever card is in view.
+  useEffect(() => {
+    return window.mynai.onShortcutTriggered(({ id }) => {
+      const chip = FOLLOW_UP_CHIPS.find((c) => c.shortcutId === id)
+      if (chip) {
+        sendFollowUp(chip.instruction)
+      } else if (id === 'follow-up-voice') {
+        toggleVoiceFollowUp()
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card.id, card.status, followUpBusy, voiceFollowUpCardId, micStatus])
 
   async function handleCopy(): Promise<void> {
     const parts = [card.answer]
@@ -70,14 +124,6 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
     if (!corrected || busy) return
     setEditingQuestion(false)
     reAskCard(card.id, corrected, useSessionStore.getState().form)
-  }
-
-  async function sendFollowUp(instruction: string): Promise<void> {
-    if (!instruction.trim() || busy) return
-    setFollowUpBusy(true)
-    setFollowUpText('')
-    await askFollowUp(card.id, instruction.trim(), useSessionStore.getState().form)
-    setFollowUpBusy(false)
   }
 
   return (
@@ -151,39 +197,50 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
       {card.pendingFollowUp && <PendingFollowUpBlock pending={card.pendingFollowUp} busy={followUpBusy} />}
 
       {card.status !== 'streaming' && (
-        <div className="space-y-2 border-t border-white/10 pt-3">
-          <div className="flex flex-wrap gap-1.5">
-            {FOLLOW_UP_CHIPS.map((chip) => (
-              <button
-                key={chip.label}
-                onClick={() => sendFollowUp(chip.instruction)}
-                disabled={busy}
-                className="flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-xs text-neutral-300 transition hover:bg-white/15 disabled:opacity-40"
-              >
-                <Plus size={11} />
-                {chip.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <input
-              value={followUpText}
-              onChange={(e) => setFollowUpText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') sendFollowUp(followUpText)
-              }}
-              placeholder="Add something to this answer…"
-              disabled={busy}
-              className="flex-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-neutral-100 placeholder:text-neutral-500 outline-none focus:border-white/25 disabled:opacity-40"
-            />
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-white/10 pt-3">
+          {FOLLOW_UP_CHIPS.map((chip) => (
             <button
-              onClick={() => sendFollowUp(followUpText)}
-              disabled={busy || !followUpText.trim()}
-              className="shrink-0 rounded-lg bg-white/10 p-1.5 text-neutral-300 transition hover:bg-white/20 disabled:opacity-40"
+              key={chip.label}
+              onClick={() => sendFollowUp(chip.instruction)}
+              disabled={busy}
+              title={chip.hint}
+              className="flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-xs text-neutral-300 transition hover:bg-white/15 disabled:opacity-40"
             >
-              {followUpBusy ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+              <Plus size={11} />
+              {chip.label}
+              <span className="text-[10px] text-neutral-600">{chip.hint}</span>
             </button>
-          </div>
+          ))}
+          <button
+            onClick={toggleVoiceFollowUp}
+            disabled={busy || (!micReady && !voiceArmedForThisCard)}
+            title={
+              voiceArmedForThisCard
+                ? 'Listening — click to cancel'
+                : micReady
+                  ? 'Speak a follow-up (Alt+Shift+V)'
+                  : 'Turn on mic first to use voice follow-up'
+            }
+            className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs transition disabled:opacity-40 ${
+              voiceArmedForThisCard
+                ? 'bg-red-500/20 text-red-300'
+                : 'bg-white/5 text-neutral-300 hover:bg-white/15'
+            }`}
+          >
+            {voiceArmedForThisCard ? (
+              <>
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-400" />
+                Listening…
+                <X size={11} />
+              </>
+            ) : (
+              <>
+                <Mic size={11} />
+                Speak
+                <span className="text-[10px] text-neutral-600">Alt+Shift+V</span>
+              </>
+            )}
+          </button>
         </div>
       )}
     </div>

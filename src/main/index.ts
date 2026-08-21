@@ -1,6 +1,7 @@
-import { app, BrowserWindow, dialog } from 'electron'
+import { app, BrowserWindow, dialog, globalShortcut } from 'electron'
 import { createOverlayWindow } from './windows/overlay'
 import { registerIpcHandlers } from './ipc'
+import { registerGlobalShortcuts } from './shortcuts'
 
 let overlayWindow: BrowserWindow | null = null
 
@@ -36,6 +37,7 @@ if (!gotSingleInstanceLock) {
       launchHidden: false
     })
     registerIpcHandlers(overlayWindow)
+    registerGlobalShortcuts(overlayWindow)
 
     overlayWindow.webContents.on('render-process-gone', (_event, details) => {
       console.error('[MynaI] Renderer crashed:', details.reason)
@@ -77,5 +79,13 @@ if (!gotSingleInstanceLock) {
     if (process.platform !== 'darwin') {
       app.quit()
     }
+  })
+
+  // Required Electron cleanup — a missed unregister leaves the OS-level
+  // hotkeys bound after the app exits, which then silently fails to
+  // re-register them ("already in use by another application") on the next
+  // launch until the OS itself releases them.
+  app.on('will-quit', () => {
+    globalShortcut.unregisterAll()
   })
 }

@@ -1,4 +1,13 @@
-import { app, desktopCapturer, ipcMain, screen, type BrowserWindow, type IpcMainEvent, type Rectangle } from 'electron'
+import {
+  app,
+  desktopCapturer,
+  globalShortcut,
+  ipcMain,
+  screen,
+  type BrowserWindow,
+  type IpcMainEvent,
+  type Rectangle
+} from 'electron'
 import {
   IPC_CHANNELS,
   type AppSettings,
@@ -164,6 +173,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     // Windows, since it tries the window's close path first and the window
     // refuses. Tear down explicitly and force-exit instead.
     stt.dispose()
+    globalShortcut.unregisterAll()
     if (!window.isDestroyed()) window.destroy()
     app.exit(0)
   })
