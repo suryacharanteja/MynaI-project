@@ -62,12 +62,21 @@ export function createOverlayWindow(options: OverlayWindowOptions): BrowserWindo
     overlay.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
+  // 'display-capture' is the permission Chromium gates getDisplayMedia()
+  // under — a different permission type from 'media' (which only covers
+  // getUserMedia's camera/mic access). System audio capture switched from
+  // getUserMedia to getDisplayMedia (electron-audio-loopback) but this
+  // handler was never updated to match, so the display-capture request was
+  // being silently denied — the app reached "connected" but never actually
+  // got a real audio stream.
+  const ALLOWED_PERMISSIONS = new Set(['media', 'display-capture'])
+
   overlay.webContents.session.setPermissionRequestHandler((_webContents, permission, callback) => {
-    callback(permission === 'media')
+    callback(ALLOWED_PERMISSIONS.has(permission))
   })
 
   overlay.webContents.session.setPermissionCheckHandler((_webContents, permission) => {
-    return permission === 'media'
+    return ALLOWED_PERMISSIONS.has(permission)
   })
 
   applyStealth(overlay, hideFromScreenCapture)

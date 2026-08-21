@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createAudioCapture } from '../audio/capture'
+import type { AudioSource } from '../audio/source-state'
 import { useOverlayStore } from '../../stores/overlay-store'
 import { useSessionStore } from '../../stores/session-store'
 import { isLikelyQuestion, isDuplicateQuestion, isLikelyGarbledTranscript } from './question-detector'
@@ -42,6 +43,20 @@ const VOICE_FOLLOWUP_SILENCE_MS = 1800
 /** If nothing is said at all within this long after arming, auto-cancel
  *  rather than leaving voice follow-up armed indefinitely. */
 const VOICE_FOLLOWUP_ARM_TIMEOUT_MS = 10000
+/**
+ * "Connected" (sttStatus === 'listening') only means the WebSocket handshake
+ * succeeded — it says nothing about whether the audio track underneath is
+ * actually carrying sound. On Windows the old capture mechanism frequently
+ * produced a track that "worked" with zero real audio data, and the UI had
+ * no way to tell the difference: it just sat on "Listening…" forever. RMS
+ * level below this floor counts as silence, not signal.
+ */
+const SIGNAL_NOISE_FLOOR = 0.01
+const SYSTEM_SILENCE_CHECK_INTERVAL_MS = 5000
+/** How long system audio can be connected with zero real signal before it's
+ *  treated as dead — one auto-retry happens at this point, then a second
+ *  miss surfaces a persistent, actionable error instead of staying silent. */
+const SYSTEM_SILENCE_THRESHOLD_MS = 20000
 
 interface RecentTurn {
   text: string
@@ -55,7 +70,29 @@ export function useLiveTranscription() {
   const setQuestionDetected = useOverlayStore((s) => s.setQuestionDetected)
   const [error, setError] = useState<string | null>(null)
   const [micOn, setMicOn] = useState(false)
-  const captureRef = useRef(createAudioCapture())
+  const [systemAudioIssue, setSystemAudioIssue] = useState(false)
+  const lastSystemSignalAtRef = useRef(0)
+  const systemListeningSinceRef = useRef<number | null>(null)
+  const systemAutoRetriedRef = useRef(false)
+  const captureRef = useRef(
+    createAudioCapture(
+      // Surfaced to the DevTools console (not the user) — this is what lets
+      // us actually see, from a real test, whether getDisplayMedia returned
+      // a real audio track and whether it's carrying sound, instead of
+      // guessing from the silence watchdog's conclusion alone.
+      (level, code, message) => {
+        const log = level === 'error' ? console.error : console.log
+        log(`[audio] ${code}: ${message}`)
+      },
+      (source: AudioSource, level: number) => {
+        if (source === 'system' && level > SIGNAL_NOISE_FLOOR) {
+          lastSystemSignalAtRef.current = Date.now()
+          systemAutoRetriedRef.current = false
+          setSystemAudioIssue(false)
+        }
+      }
+    )
+  )
   const lastAutoAnswerAtRef = useRef(0)
   const recentQuestionsRef = useRef<string[]>([])
   const bufferRef = useRef<RecentTurn[]>([])
@@ -153,7 +190,12 @@ export function useLiveTranscription() {
 
     const unsubStatus = window.mynai.onSttStatus((e) => {
       setSttStatus(e.source, e.status)
-      if (e.status === 'listening') setError(null)
+      if (e.status === 'listening') {
+        setError(null)
+        if (e.source === 'system') systemListeningSinceRef.current = Date.now()
+      } else if (e.source === 'system') {
+        systemListeningSinceRef.current = null
+      }
     })
     const unsubPartial = window.mynai.onSttPartial((e) => setPartialText(e.source, e.text))
     const unsubFinal = window.mynai.onSttFinal((e) => {
@@ -206,11 +248,41 @@ export function useLiveTranscription() {
     })
     const unsubError = window.mynai.onSttError((e) => setError(e.error))
 
+    // Connected-but-silent watchdog: sttStatus only reflects the WebSocket
+    // handshake, not whether the audio track carries real sound. If system
+    // audio has been "listening" this long with zero signal above the noise
+    // floor, try one automatic restart; a second miss means something is
+    // genuinely wrong (sharing not enabled, wrong device, muted output) and
+    // gets surfaced as a persistent, actionable error instead of silently
+    // sitting on "Listening…" forever.
+    const silenceWatchdog = setInterval(() => {
+      if (systemListeningSinceRef.current === null) return
+      const now = Date.now()
+      const sinceListening = now - systemListeningSinceRef.current
+      if (sinceListening < SYSTEM_SILENCE_THRESHOLD_MS) return
+      const sinceSignal = lastSystemSignalAtRef.current === 0 ? sinceListening : now - lastSystemSignalAtRef.current
+      if (sinceSignal < SYSTEM_SILENCE_THRESHOLD_MS) return
+
+      if (!systemAutoRetriedRef.current) {
+        systemAutoRetriedRef.current = true
+        capture
+          .stopSystem()
+          .then(() => capture.startSystem())
+          .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+      } else {
+        setSystemAudioIssue(true)
+        setError(
+          "System audio isn't producing any sound. Check that audio sharing is enabled for this call, then click Retry."
+        )
+      }
+    }, SYSTEM_SILENCE_CHECK_INTERVAL_MS)
+
     capture.startSystem().catch((err) => setError(err instanceof Error ? err.message : String(err)))
 
     return () => {
       clearSilenceTimer()
       clearVoiceFollowUpTimers()
+      clearInterval(silenceWatchdog)
       unsubVoiceArm()
       unsubStatus()
       unsubPartial()
@@ -235,5 +307,17 @@ export function useLiveTranscription() {
     }
   }
 
-  return { error, micOn, toggleMic }
+  async function retrySystemAudio(): Promise<void> {
+    systemAutoRetriedRef.current = false
+    setSystemAudioIssue(false)
+    setError(null)
+    try {
+      await captureRef.current.stopSystem()
+      await captureRef.current.startSystem()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  return { error, micOn, toggleMic, systemAudioIssue, retrySystemAudio }
 }

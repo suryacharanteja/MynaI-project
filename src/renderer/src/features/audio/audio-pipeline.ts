@@ -9,6 +9,7 @@ const WORKLET_MODULE_PATH = '/pcm-capture-worklet.js'
 
 type MonitorLogger = (level: string, code: string, message: string, source?: string, meta?: Record<string, unknown>) => void
 type SendAudioChunk = (source: AudioSource, buffer: ArrayBuffer) => void
+type LevelReporter = (source: AudioSource, level: number) => void
 
 interface SampleQueue {
   chunks: Float32Array[]
@@ -17,10 +18,12 @@ interface SampleQueue {
 
 export function createAudioPipeline({
   sendAudioChunk,
-  addMonitorLog
+  addMonitorLog,
+  onLevel
 }: {
   sendAudioChunk: SendAudioChunk
   addMonitorLog: MonitorLogger
+  onLevel?: LevelReporter
 }) {
   const workletLoadedContexts = new WeakSet<AudioContext>()
   const sourceSampleQueues: Record<AudioSource, SampleQueue> = {
@@ -84,37 +87,61 @@ export function createAudioPipeline({
     workletLoadedContexts.add(context)
   }
 
+  function computeRms(samples: Float32Array): number {
+    if (samples.length === 0) return 0
+    let sumSquares = 0
+    for (let i = 0; i < samples.length; i += 1) {
+      sumSquares += samples[i] * samples[i]
+    }
+    return Math.sqrt(sumSquares / samples.length)
+  }
+
   function isLikelyCameraTrack(trackLabel: string): boolean {
     const label = String(trackLabel || '').toLowerCase()
     return label.includes('camera') || label.includes('webcam')
   }
 
-  async function getSystemAudioStream(sourceId: string): Promise<MediaStream> {
-    const mandatoryConstraints = {
-      audio: {
-        mandatory: {
-          chromeMediaSource: 'desktop',
-          chromeMediaSourceId: sourceId
-        }
-      },
-      video: {
-        mandatory: {
-          chromeMediaSource: 'desktop',
-          chromeMediaSourceId: sourceId
-        }
-      }
-    } as unknown as MediaStreamConstraints
-
-    const flatConstraints = {
-      audio: { chromeMediaSource: 'desktop', chromeMediaSourceId: sourceId },
-      video: { chromeMediaSource: 'desktop', chromeMediaSourceId: sourceId }
-    } as unknown as MediaStreamConstraints
-
+  /**
+   * The old chromeMediaSource:'desktop' getUserMedia constraint hack was
+   * repurposing a video/tab-capture API to also carry audio as a side
+   * effect — on Windows it frequently "succeeded" (no thrown error) with an
+   * audio track that carried no actual sound, since it doesn't reliably
+   * engage real OS-level loopback capture. electron-audio-loopback solves
+   * this properly via Electron's session.setDisplayMediaRequestHandler:
+   * the main process (see src/main/index.ts's initMain() call) intercepts
+   * getDisplayMedia and resolves it with a genuine loopback-audio stream.
+   * enableLoopbackAudio()/disableLoopbackAudio() bracket the call so the
+   * main-process handler is only active for the moment it's needed.
+   */
+  async function getSystemAudioStream(): Promise<MediaStream> {
+    await window.mynai.enableLoopbackAudio()
     try {
-      return await navigator.mediaDevices.getUserMedia(mandatoryConstraints)
-    } catch (_mandatoryError) {
-      addMonitorLog('info', 'desktop-constraints-fallback', 'Mandatory desktop constraints failed; trying flat syntax', 'system')
-      return navigator.mediaDevices.getUserMedia(flatConstraints)
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
+      const audioTracks = stream.getAudioTracks()
+      // Diagnostic only — distinguishes "got no audio track at all" (a
+      // capture/permission problem) from "got a track but it's silent" (an
+      // OS loopback-routing problem), instead of guessing from the RMS
+      // watchdog alone.
+      addMonitorLog(
+        'info',
+        'system-audio-stream-acquired',
+        `getDisplayMedia resolved with ${audioTracks.length} audio track(s)`,
+        'system',
+        {
+          audioTracks: audioTracks.map((t) => ({
+            label: t.label,
+            readyState: t.readyState,
+            muted: t.muted,
+            settings: t.getSettings()
+          }))
+        }
+      )
+      if (audioTracks.length === 0) {
+        addMonitorLog('error', 'system-audio-no-track', 'getDisplayMedia returned zero audio tracks', 'system')
+      }
+      return stream
+    } finally {
+      await window.mynai.disableLoopbackAudio()
     }
   }
 
@@ -211,6 +238,7 @@ export function createAudioPipeline({
 
     const silentGain = context.createGain()
     silentGain.gain.value = 0
+    let levelLogCounter = 0
 
     node.port.onmessage = (event: MessageEvent) => {
       if (!activeCheck()) {
@@ -219,6 +247,18 @@ export function createAudioPipeline({
 
       try {
         const chunk = event.data instanceof Float32Array ? event.data : new Float32Array(event.data || [])
+        if (onLevel) {
+          const rms = computeRms(chunk)
+          onLevel(normalizeSource(source), rms)
+          // Periodic RMS heartbeat (~every 100 chunks) — lets a real test
+          // show whether the source is truly silent (always ~0) vs. just
+          // below the noise floor vs. genuinely carrying speech, instead of
+          // only knowing the watchdog's after-the-fact pass/fail verdict.
+          levelLogCounter += 1
+          if (levelLogCounter % 100 === 0) {
+            addMonitorLog('info', 'audio-level', `RMS level: ${rms.toFixed(5)}`, source)
+          }
+        }
         const normalizedChunk = downsampleFloat32Buffer(chunk, context.sampleRate, TARGET_SAMPLE_RATE)
         appendSourceSamples(source, normalizedChunk)
         drainSourceSampleQueue(source)

@@ -132,6 +132,8 @@ export interface MynaiApi {
   onAiChunk: (callback: (event: AskAiChunkEvent) => void) => () => void
   onAiDone: (callback: (event: AskAiDoneEvent) => void) => () => void
   onAiError: (callback: (event: AskAiErrorEvent) => void) => () => void
+  enableLoopbackAudio: () => Promise<void>
+  disableLoopbackAudio: () => Promise<void>
   sttGetDesktopSources: () => Promise<DesktopSource[]>
   sttStart: (source: string) => Promise<SttStartResult>
   sttStop: (source: string) => Promise<void>

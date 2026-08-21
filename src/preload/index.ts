@@ -28,6 +28,13 @@ const api: MynaiApi = {
   onAiDone: (callback: (event: AskAiDoneEvent) => void) => subscribe(IPC_CHANNELS.aiDone, callback),
   onAiError: (callback: (event: AskAiErrorEvent) => void) => subscribe(IPC_CHANNELS.aiError, callback),
 
+  // Raw channel names owned by the electron-audio-loopback package itself
+  // (see node_modules/electron-audio-loopback/dist/config.js) — not routed
+  // through our own IPC_CHANNELS since we don't own the handler side of
+  // these, `initMain()` in src/main/index.ts does.
+  enableLoopbackAudio: () => ipcRenderer.invoke('enable-loopback-audio'),
+  disableLoopbackAudio: () => ipcRenderer.invoke('disable-loopback-audio'),
+
   sttGetDesktopSources: () => ipcRenderer.invoke(IPC_CHANNELS.sttGetDesktopSources),
   sttStart: (source: string) => ipcRenderer.invoke(IPC_CHANNELS.sttStart, source),
   sttStop: (source: string) => ipcRenderer.invoke(IPC_CHANNELS.sttStop, source),

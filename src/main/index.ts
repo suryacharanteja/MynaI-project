@@ -1,7 +1,16 @@
 import { app, BrowserWindow, dialog, globalShortcut } from 'electron'
+import { initMain as initLoopbackAudio } from 'electron-audio-loopback'
 import { createOverlayWindow } from './windows/overlay'
 import { registerIpcHandlers } from './ipc'
 import { registerGlobalShortcuts } from './shortcuts'
+
+// Sets Chromium command-line feature flags for system-audio loopback — must
+// run before app.whenReady(), since Chromium reads --enable-features at
+// startup. Replaces the old chromeMediaSource:'desktop' getUserMedia hack,
+// which frequently "succeeded" with a track that carried no actual audio
+// data on Windows — the root cause of system audio silently producing zero
+// transcript with no error shown.
+initLoopbackAudio()
 
 let overlayWindow: BrowserWindow | null = null
 

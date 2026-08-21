@@ -7,13 +7,15 @@ export function TranscriptStrip({
   onToggleMic,
   onHome,
   onMinimize,
-  onClose
+  onClose,
+  systemAudioIssue
 }: {
   micOn: boolean
   onToggleMic: () => void
   onHome: () => void
   onMinimize: () => void
   onClose: () => void
+  systemAudioIssue: boolean
 }): React.JSX.Element {
   const transcript = useOverlayStore((s) => s.transcript)
   const partialText = useOverlayStore((s) => s.partialText)
@@ -44,13 +46,26 @@ export function TranscriptStrip({
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       title="Drag anywhere on this bar to move the window"
     >
-      <div className="flex items-center gap-1.5 text-neutral-400" title={`System audio: ${sttStatus.system}`}>
-        <Radio size={14} className={isListening ? 'text-emerald-400' : undefined} />
+      <div
+        className="flex items-center gap-1.5 text-neutral-400"
+        title={systemAudioIssue ? 'System audio: connected but no sound detected' : `System audio: ${sttStatus.system}`}
+      >
+        <Radio
+          size={14}
+          className={systemAudioIssue ? 'text-amber-400' : isListening ? 'text-emerald-400' : undefined}
+        />
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-hidden whitespace-nowrap text-sm text-neutral-300">
         <span className="opacity-80">
-          {liveText || (isConnecting ? 'Connecting…' : isListening ? 'Listening…' : 'Not listening')}
+          {liveText ||
+            (systemAudioIssue
+              ? 'No system audio detected…'
+              : isConnecting
+                ? 'Connecting…'
+                : isListening
+                  ? 'Listening…'
+                  : 'Not listening')}
         </span>
       </div>
 

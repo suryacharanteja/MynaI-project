@@ -9,7 +9,10 @@ interface SourceRuntime {
   queue: Promise<void>
 }
 
-export function createAudioCapture(onMonitorLog?: (level: string, code: string, message: string) => void) {
+export function createAudioCapture(
+  onMonitorLog?: (level: string, code: string, message: string) => void,
+  onLevel?: (source: AudioSource, level: number) => void
+) {
   const runtime: Record<AudioSource, SourceRuntime> = {
     mic: { context: null, stream: null, processor: null, active: false, queue: Promise.resolve() },
     system: { context: null, stream: null, processor: null, active: false, queue: Promise.resolve() }
@@ -17,7 +20,8 @@ export function createAudioCapture(onMonitorLog?: (level: string, code: string, 
 
   const pipeline = createAudioPipeline({
     sendAudioChunk: (source, buffer) => window.mynai.sttSendAudioChunk(source, buffer),
-    addMonitorLog: (level, _code, message) => onMonitorLog?.(level, _code, message)
+    addMonitorLog: (level, _code, message) => onMonitorLog?.(level, _code, message),
+    onLevel
   })
 
   /**
@@ -69,13 +73,13 @@ export function createAudioCapture(onMonitorLog?: (level: string, code: string, 
   async function doStartSystem(): Promise<void> {
     if (runtime.system.active) return
 
-    const sources = await window.mynai.sttGetDesktopSources()
-    if (sources.length === 0) throw new Error('No desktop sources found.')
-
     const result = await window.mynai.sttStart('system')
     if (!result.success) throw new Error(result.error ?? 'Failed to start system-audio transcription.')
 
-    const stream = await pipeline.getSystemAudioStream(sources[0].id)
+    // Source selection is handled entirely by the main process's
+    // setDisplayMediaRequestHandler (electron-audio-loopback) now — no more
+    // desktopCapturer round trip or blind sources[0] pick from here.
+    const stream = await pipeline.getSystemAudioStream()
     const videoTrack = stream.getVideoTracks()[0]
     if (videoTrack && pipeline.isLikelyCameraTrack(videoTrack.label)) {
       stream.getTracks().forEach((track) => track.stop())
