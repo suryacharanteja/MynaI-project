@@ -48,7 +48,9 @@ export default function App(): React.JSX.Element {
           <OverlayHUD onHome={handleHome} onMinimize={handleMinimize} onClose={handleClose} />
         </div>
       )}
-      {screen === 'session' && !minimized && <CreateSessionScreen onCreate={() => setScreen('overlay')} />}
+      {screen === 'session' && !minimized && (
+        <CreateSessionScreen onCreate={() => setScreen('overlay')} onMinimize={handleMinimize} />
+      )}
 
       {minimized && (
         <div className="flex h-full w-full items-center justify-center">

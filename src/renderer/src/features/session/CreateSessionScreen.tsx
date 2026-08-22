@@ -83,7 +83,13 @@ const API_KEY_FOR_PROVIDER: Record<LlmProvider, string> = {
 
 type FieldErrors = Record<string, string>
 
-export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): React.JSX.Element {
+export function CreateSessionScreen({
+  onCreate,
+  onMinimize
+}: {
+  onCreate?: () => void
+  onMinimize?: () => void
+}): React.JSX.Element {
   const { form, setSessionType, setField } = useSessionStore()
   const [activeTab, setActiveTab] = useState<'create' | 'sessions'>('create')
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -146,7 +152,10 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
     <div className="relative flex h-full w-full flex-col overflow-hidden rounded-2xl border border-black/10 bg-white/95 text-neutral-900 shadow-2xl backdrop-blur-xl">
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
 
-      <TitleBar onMinimize={() => window.mynai.windowMinimize()} onClose={() => window.mynai.windowClose()}>
+      <TitleBar
+        onMinimize={onMinimize ?? (() => window.mynai.windowMinimize())}
+        onClose={() => window.mynai.windowClose()}
+      >
         <button
           onClick={() => setSettingsOpen(true)}
           className="rounded-full p-1.5 text-neutral-500 transition hover:bg-black/5 hover:text-neutral-900"
