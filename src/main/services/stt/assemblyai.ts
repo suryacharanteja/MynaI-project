@@ -195,7 +195,14 @@ export function createAssemblyAiSttService(webContents: WebContents) {
       // sometimes came back as Chinese/Hindi/etc. This is a dedicated
       // English-only model, not just biasing a multilingual one toward
       // English — it can't output another language's script at all.
-      speech_model: 'universal-streaming-english'
+      speech_model: 'universal-streaming-english',
+      // Defaults (max_turn_silence: 1280ms, end_of_turn_confidence_threshold:
+      // 0.4) were cutting a turn mid-question on a normal thinking pause or
+      // breath, splitting one spoken question into two answer cards. Raising
+      // both makes AssemblyAI itself wait longer and need higher confidence
+      // before forcing end_of_turn.
+      max_turn_silence: '2500',
+      end_of_turn_confidence_threshold: '0.6'
     })
     const ws = new WebSocket(`wss://${host}/v3/ws?${query.toString()}`, {
       headers: { Authorization: apiKey }

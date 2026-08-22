@@ -31,7 +31,7 @@ const SILENCE_DEBOUNCE_MS = 1800
  * than a question mark, so give it more room before committing — this is
  * what stops that from firing as two separate auto-answer cards.
  */
-const SILENCE_DEBOUNCE_NO_QUESTION_MARK_MS = 3200
+const SILENCE_DEBOUNCE_NO_QUESTION_MARK_MS = 4000
 /** Safety valve: if the interviewer talks continuously with no pause longer
  *  than the debounce, don't wait forever — force an evaluation once the
  *  buffer has been accumulating this long. */

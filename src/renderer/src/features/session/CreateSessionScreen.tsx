@@ -6,6 +6,7 @@ import { createSessionFormSchema } from '@shared/schemas'
 import { useSessionStore } from '../../stores/session-store'
 import { FieldLabel, TextArea, TextInput } from '../../components/ui/field-shell'
 import { Toggle } from '../../components/ui/toggle'
+import { Dropdown } from '../../components/ui/dropdown'
 import { SettingsModal } from '../settings/SettingsModal'
 import { TitleBar } from '../../components/ui/title-bar'
 import { CallSessionsList } from './CallSessionsList'
@@ -266,39 +267,24 @@ export function CreateSessionScreen({ onCreate }: { onCreate?: () => void }): Re
           <div>
             <FieldLabel>Output Settings</FieldLabel>
             <div className="flex flex-wrap gap-2">
-              <select
+              <Dropdown
                 value={form.provider}
-                onChange={(e) => handleProviderChange(e.target.value as LlmProvider)}
-                className="rounded-lg border border-black/10 bg-black/[0.02] px-3 py-1.5 text-sm text-neutral-700 outline-none"
-              >
-                {(Object.keys(PROVIDER_LABELS) as LlmProvider[]).map((p) => (
-                  <option key={p} value={p}>
-                    {PROVIDER_LABELS[p]}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={(v) => handleProviderChange(v as LlmProvider)}
+                options={(Object.keys(PROVIDER_LABELS) as LlmProvider[]).map((p) => ({
+                  value: p,
+                  label: PROVIDER_LABELS[p]
+                }))}
+              />
+              <Dropdown
                 value={form.model}
-                onChange={(e) => setField('model', e.target.value)}
-                className="rounded-lg border border-black/10 bg-black/[0.02] px-3 py-1.5 text-sm text-neutral-700 outline-none"
-              >
-                {PROVIDER_MODELS[form.provider].map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={(v) => setField('model', v)}
+                options={PROVIDER_MODELS[form.provider]}
+              />
+              <Dropdown
                 value={form.outputLanguage}
-                onChange={(e) => setField('outputLanguage', e.target.value)}
-                className="rounded-lg border border-black/10 bg-black/[0.02] px-3 py-1.5 text-sm text-neutral-700 outline-none"
-              >
-                {LANGUAGE_OPTIONS.map((l) => (
-                  <option key={l} value={l}>
-                    {l}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setField('outputLanguage', v)}
+                options={LANGUAGE_OPTIONS.map((l) => ({ value: l, label: l }))}
+              />
               <button className="flex items-center gap-1.5 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-1.5 text-sm text-neutral-700 hover:bg-black/[0.06]">
                 <MessageSquare size={14} /> Answer Preferences
               </button>
