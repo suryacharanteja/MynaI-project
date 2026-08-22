@@ -12,6 +12,8 @@ import {
   Plus,
   Mic,
   Repeat,
+  Square,
+  Camera,
   X
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -89,6 +91,26 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
   function toggleReCapture(): void {
     if (busy) return
     setReCaptureCardId(reCaptureArmedForThisCard ? null : card.id)
+  }
+
+  async function handleScreenshot(): Promise<void> {
+    if (busy) return
+    setFollowUpBusy(true)
+    try {
+      const result = await window.mynai.screenshotCapture()
+      if (result.error || !result.dataUrl) {
+        toast.error(result.error ?? 'Screenshot capture failed.')
+        return
+      }
+      await askFollowUp(
+        card.id,
+        'Use the attached screenshot — it may show code, a diagram, or on-screen context — to inform or extend this answer.',
+        useSessionStore.getState().form,
+        result.dataUrl
+      )
+    } finally {
+      setFollowUpBusy(false)
+    }
   }
 
   // Global shortcuts fire from the main process regardless of window focus —
@@ -183,9 +205,9 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
                   disabled={busy || (!systemReady && !reCaptureArmedForThisCard)}
                   title={
                     reCaptureArmedForThisCard
-                      ? 'Listening — click to cancel'
+                      ? 'Listening — press again once the interviewer finishes repeating it'
                       : systemReady
-                        ? 'Question captured wrong? Ask the interviewer to repeat it, then press this (Alt+Shift+R)'
+                        ? 'Question captured wrong? Ask the interviewer to repeat it, press this, then press it again when they finish (Alt+Shift+R)'
                         : 'Waiting for system audio to connect'
                   }
                   className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition disabled:opacity-40 ${
@@ -197,8 +219,8 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
                   {reCaptureArmedForThisCard ? (
                     <>
                       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-400" />
-                      Listening for repeat…
-                      <X size={10} />
+                      Listening… Stop &amp; Reask
+                      <Square size={9} />
                     </>
                   ) : (
                     <>
@@ -261,6 +283,15 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
               <span className="text-[10px] text-neutral-600">{chip.hint}</span>
             </button>
           ))}
+          <button
+            onClick={handleScreenshot}
+            disabled={busy}
+            title="Capture the screen and attach it as context for this question — useful when the interviewer shared a coding question visually (shared editor, pasted chat, a second portal)"
+            className="flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-xs text-neutral-300 transition hover:bg-white/15 disabled:opacity-40"
+          >
+            <Camera size={11} />
+            Screenshot
+          </button>
           <button
             onClick={toggleVoiceFollowUp}
             disabled={busy || (!micReady && !voiceArmedForThisCard)}
@@ -351,6 +382,13 @@ function FollowUpBlock({ entry }: { entry: FollowUpEntry }): React.JSX.Element {
   return (
     <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.03] p-3">
       <p className="text-xs font-medium text-neutral-400">↳ {entry.instruction}</p>
+      {entry.imageDataUrl && (
+        <img
+          src={entry.imageDataUrl}
+          alt="Attached screenshot"
+          className="max-h-24 w-auto rounded border border-white/10 object-contain"
+        />
+      )}
       {isError ? (
         <p className="text-xs text-red-400">{entry.answer}</p>
       ) : (
@@ -371,6 +409,13 @@ function PendingFollowUpBlock({
   return (
     <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.03] p-3">
       <p className="text-xs font-medium text-neutral-400">↳ {pending.instruction}</p>
+      {pending.imageDataUrl && (
+        <img
+          src={pending.imageDataUrl}
+          alt="Attached screenshot"
+          className="max-h-24 w-auto rounded border border-white/10 object-contain"
+        />
+      )}
       {isError ? (
         <p className="text-xs text-red-400">{pending.answer}</p>
       ) : (

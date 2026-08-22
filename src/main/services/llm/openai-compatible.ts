@@ -23,7 +23,17 @@ export async function askOpenAiCompatible(
     },
     body: JSON.stringify({
       model: params.model,
-      messages: [{ role: 'user', content: buildPrompt(params) }],
+      messages: [
+        {
+          role: 'user',
+          content: params.imageDataUrl
+            ? [
+                { type: 'text', text: buildPrompt(params) },
+                { type: 'image_url', image_url: { url: params.imageDataUrl } }
+              ]
+            : buildPrompt(params)
+        }
+      ],
       temperature: 0.4,
       stream: true
     })

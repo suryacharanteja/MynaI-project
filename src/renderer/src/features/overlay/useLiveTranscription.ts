@@ -43,11 +43,17 @@ const VOICE_FOLLOWUP_SILENCE_MS = 1800
 /** If nothing is said at all within this long after arming, auto-cancel
  *  rather than leaving voice follow-up armed indefinitely. */
 const VOICE_FOLLOWUP_ARM_TIMEOUT_MS = 10000
-/** Re-listen: same silence-debounce/arm-timeout shape as voice follow-up,
- *  but listening on system audio (the interviewer repeating the question)
- *  instead of the candidate's own mic. */
-const RECAPTURE_SILENCE_MS = 1800
-const RECAPTURE_ARM_TIMEOUT_MS = 10000
+/**
+ * Re-listen is explicitly toggled on/off by the user (not silence-debounced
+ * like the auto-answer pipeline or voice follow-up) — it's a rare,
+ * deliberate, high-stakes recovery action, exactly the case where a guessed
+ * pause is the wrong tool and explicit "I'm done" control is the right one.
+ * Silence-based timing was cutting genuine questions off mid-sentence. This
+ * is just a safety ceiling so it can't stay armed forever if the toggle-off
+ * is forgotten — it force-finalizes with whatever was captured, it doesn't
+ * silently discard.
+ */
+const RECAPTURE_MAX_ARM_MS = 90000
 /**
  * "Connected" (sttStatus === 'listening') only means the WebSocket handshake
  * succeeded — it says nothing about whether the audio track underneath is
@@ -116,8 +122,7 @@ export function useLiveTranscription() {
   const voiceFollowUpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const voiceFollowUpArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reCaptureBufferRef = useRef<RecentTurn[]>([])
-  const reCaptureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const reCaptureArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reCaptureCeilingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const capture = captureRef.current
@@ -206,52 +211,47 @@ export function useLiveTranscription() {
       }
     })
 
-    function clearReCaptureTimers(): void {
-      if (reCaptureTimerRef.current) {
-        clearTimeout(reCaptureTimerRef.current)
-        reCaptureTimerRef.current = null
+    // cardId passed explicitly rather than read from the store: this is
+    // called from the arm-watcher's "just unarmed" branch below, where the
+    // store's CURRENT reCaptureCardId is already null — prev.reCaptureCardId
+    // is the only place that still has it.
+    function finalizeReCapture(cardId: string): void {
+      if (reCaptureCeilingTimerRef.current) {
+        clearTimeout(reCaptureCeilingTimerRef.current)
+        reCaptureCeilingTimerRef.current = null
       }
-      if (reCaptureArmTimerRef.current) {
-        clearTimeout(reCaptureArmTimerRef.current)
-        reCaptureArmTimerRef.current = null
-      }
-    }
-
-    function finalizeReCapture(): void {
-      clearReCaptureTimers()
       const turns = reCaptureBufferRef.current
       reCaptureBufferRef.current = []
-      const { reCaptureCardId, setReCaptureCardId } = useOverlayStore.getState()
-      setReCaptureCardId(null)
-      if (!reCaptureCardId || turns.length === 0) return
+      if (turns.length === 0) return // toggled off with nothing said — harmless no-op
 
       const capturedQuestion = turns.map((t) => t.text).join(' ').trim()
       if (!capturedQuestion) return
 
       const { form } = useSessionStore.getState()
-      reAskCard(reCaptureCardId, capturedQuestion, form)
+      reAskCard(cardId, capturedQuestion, form)
     }
 
-    // Same arm-watcher shape as voice follow-up above, mirrored for
-    // re-capture — starts the "nothing was said at all" safety timeout the
-    // moment a card arms Re-listen (AnswerCardView calling
-    // setReCaptureCardId), since the system-turn handler below only knows
-    // about turns that actually arrive.
+    // Re-listen is a manual toggle now, not silence-debounced: arming starts
+    // the ~90s safety ceiling (see RECAPTURE_MAX_ARM_MS); the ONLY place that
+    // finalizes is this same subscriber's "just unarmed" branch, which fires
+    // identically whether the user explicitly clicked "Stop & Reask" or the
+    // ceiling cleared it — one code path, no risk of double-dispatch.
     const unsubReCaptureArm = useOverlayStore.subscribe((state, prev) => {
       if (state.reCaptureCardId && state.reCaptureCardId !== prev.reCaptureCardId) {
         reCaptureBufferRef.current = []
-        if (reCaptureArmTimerRef.current) clearTimeout(reCaptureArmTimerRef.current)
-        reCaptureArmTimerRef.current = setTimeout(() => {
-          if (
-            useOverlayStore.getState().reCaptureCardId === state.reCaptureCardId &&
-            reCaptureBufferRef.current.length === 0
-          ) {
+        const armedCardId = state.reCaptureCardId
+        if (reCaptureCeilingTimerRef.current) clearTimeout(reCaptureCeilingTimerRef.current)
+        reCaptureCeilingTimerRef.current = setTimeout(() => {
+          if (useOverlayStore.getState().reCaptureCardId === armedCardId) {
             useOverlayStore.getState().setReCaptureCardId(null)
           }
-        }, RECAPTURE_ARM_TIMEOUT_MS)
+        }, RECAPTURE_MAX_ARM_MS)
       } else if (!state.reCaptureCardId && prev.reCaptureCardId) {
-        clearReCaptureTimers()
-        reCaptureBufferRef.current = []
+        if (reCaptureCeilingTimerRef.current) {
+          clearTimeout(reCaptureCeilingTimerRef.current)
+          reCaptureCeilingTimerRef.current = null
+        }
+        finalizeReCapture(prev.reCaptureCardId)
       }
     })
 
@@ -300,9 +300,9 @@ export function useLiveTranscription() {
       // request would also feed the normal detector and spawn an unrelated
       // duplicate card at the same time as the targeted card regenerates.
       if (e.source === 'system' && useOverlayStore.getState().reCaptureCardId) {
+        // No per-turn timer here — accumulation just continues until the
+        // user explicitly toggles off (or the safety ceiling above fires).
         reCaptureBufferRef.current.push({ text: e.text, timestamp: Date.now() })
-        if (reCaptureTimerRef.current) clearTimeout(reCaptureTimerRef.current)
-        reCaptureTimerRef.current = setTimeout(finalizeReCapture, RECAPTURE_SILENCE_MS)
         return
       }
 
@@ -371,7 +371,7 @@ export function useLiveTranscription() {
     return () => {
       clearSilenceTimer()
       clearVoiceFollowUpTimers()
-      clearReCaptureTimers()
+      if (reCaptureCeilingTimerRef.current) clearTimeout(reCaptureCeilingTimerRef.current)
       clearInterval(silenceWatchdog)
       unsubVoiceArm()
       unsubReCaptureArm()

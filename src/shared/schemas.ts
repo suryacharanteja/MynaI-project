@@ -69,7 +69,8 @@ export const askAiRequestSchema = z.object({
   extraContext: z.string().optional(),
   answerPreferences: answerPreferencesSchema.optional(),
   followUpInstruction: z.string().min(1).optional(),
-  priorAnswer: priorAnswerSchema.optional()
+  priorAnswer: priorAnswerSchema.optional(),
+  imageDataUrl: z.string().startsWith('data:image/').optional()
 })
 
 export const answerResultSchema = z.object({

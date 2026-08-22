@@ -50,7 +50,9 @@ const api: MynaiApi = {
   windowClose: () => ipcRenderer.send(IPC_CHANNELS.windowClose),
 
   onShortcutTriggered: (callback: (event: ShortcutTriggeredEvent) => void) =>
-    subscribe(IPC_CHANNELS.shortcutTriggered, callback)
+    subscribe(IPC_CHANNELS.shortcutTriggered, callback),
+
+  screenshotCapture: () => ipcRenderer.invoke(IPC_CHANNELS.screenshotCapture)
 }
 
 contextBridge.exposeInMainWorld('mynai', api)

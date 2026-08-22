@@ -27,6 +27,11 @@ export interface AskParams {
    *  about the same question. When set, buildPrompt returns a follow-up
    *  prompt instead of a fresh-question prompt. */
   followUpInstruction?: string
+  /** A screenshot attached as extra visual context — a data URL
+   *  ("data:image/png;base64,..."). The image itself is attached to the
+   *  provider request separately (see gemini.ts/openai-compatible.ts); this
+   *  field only controls whether the TEXT prompt references it. */
+  imageDataUrl?: string
 }
 
 /**
@@ -109,6 +114,9 @@ function buildFollowUpPrompt(prior: PriorAnswerSummary, instruction: string, par
     `Original question: ${params.question}`,
     `Your existing answer so far:\n${priorSummaryLines.join('\n')}`,
     `Additional request: ${instruction}`,
+    params.imageDataUrl
+      ? 'A screenshot is attached — it may show code, a diagram, or other on-screen context relevant to this question. Use it.'
+      : null,
     "Respond with ONLY the new or updated sections needed to satisfy the additional request — do not repeat the full original answer.",
     RESPONSE_FORMAT_INSTRUCTIONS
   ]

@@ -15,6 +15,7 @@ import {
   type AskAiStartResult,
   type CreateSessionError,
   type CreateSessionResult,
+  type ScreenshotCaptureResult,
   type SessionSummary,
   type SttStartResult
 } from '../shared/ipc-contract'
@@ -147,7 +148,8 @@ export function registerIpcHandlers(window: BrowserWindow): void {
           extraContext: req.extraContext,
           answerPreferences: req.answerPreferences,
           followUpInstruction: req.followUpInstruction,
-          priorAnswer: req.priorAnswer
+          priorAnswer: req.priorAnswer,
+          imageDataUrl: req.imageDataUrl
         },
         (delta) => safeSend(window.webContents, IPC_CHANNELS.aiChunk, { cardId: req.cardId, delta })
       ).then(
@@ -181,6 +183,26 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle(IPC_CHANNELS.sttGetDesktopSources, async (): Promise<DesktopSource[]> => {
     const sources = await desktopCapturer.getSources({ types: ['screen'] })
     return sources.map((s) => ({ id: s.id, name: s.name }))
+  })
+
+  ipcMain.handle(IPC_CHANNELS.screenshotCapture, async (): Promise<ScreenshotCaptureResult> => {
+    try {
+      // Full-resolution thumbnailSize turns this into a real screenshot, not
+      // a small preview. The overlay window's own setContentProtection(true)
+      // (applyStealth) already excludes it from any OS-level capture — the
+      // same mechanism that hides it from the interviewer's screen share
+      // means it's excluded from this capture too, for free.
+      const display = screen.getPrimaryDisplay()
+      const width = Math.round(display.size.width * display.scaleFactor)
+      const height = Math.round(display.size.height * display.scaleFactor)
+      const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width, height } })
+      if (sources.length === 0 || sources[0].thumbnail.isEmpty()) {
+        return { error: 'No screen source available to capture.' }
+      }
+      return { dataUrl: sources[0].thumbnail.toDataURL() }
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : 'Screenshot capture failed.' }
+    }
   })
 
   ipcMain.handle(IPC_CHANNELS.sttStart, (_event, source: unknown): SttStartResult => {

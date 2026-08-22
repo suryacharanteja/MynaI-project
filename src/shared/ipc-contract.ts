@@ -23,7 +23,8 @@ export const IPC_CHANNELS = {
   windowMinimize: 'window:minimize',
   windowRestore: 'window:restore',
   windowClose: 'window:close',
-  shortcutTriggered: 'shortcut:triggered'
+  shortcutTriggered: 'shortcut:triggered',
+  screenshotCapture: 'screenshot:capture'
 } as const
 
 export const SHORTCUT_IDS = [
@@ -91,6 +92,15 @@ export interface AskAiRequest {
   /** Set only for a follow-up ask on an existing card — see priorAnswer. */
   followUpInstruction?: string
   priorAnswer?: PriorAnswerPayload
+  /** A screenshot attached to this specific follow-up as extra visual
+   *  context (e.g. a coding question shown on screen) — a data URL
+   *  ("data:image/png;base64,..."). */
+  imageDataUrl?: string
+}
+
+export interface ScreenshotCaptureResult {
+  dataUrl?: string
+  error?: string
 }
 
 export interface AskAiStartResult {
@@ -149,4 +159,6 @@ export interface MynaiApi {
   windowClose: () => void
 
   onShortcutTriggered: (callback: (event: ShortcutTriggeredEvent) => void) => () => void
+
+  screenshotCapture: () => Promise<ScreenshotCaptureResult>
 }
