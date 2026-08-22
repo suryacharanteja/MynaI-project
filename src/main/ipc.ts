@@ -17,7 +17,8 @@ import {
   type CreateSessionResult,
   type ScreenshotCaptureResult,
   type SessionSummary,
-  type SttStartResult
+  type SttStartResult,
+  type WindowResizeBounds
 } from '../shared/ipc-contract'
 import type { DesktopSource } from '../shared/stt-types'
 import { readSettings, writeSettings } from './store'
@@ -81,6 +82,16 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     } else {
       window.setSize(420, 640)
     }
+  })
+
+  // Manual in-DOM resize drag (see resize-handles.tsx). The window is
+  // created with resizable:false specifically to remove Electron's native
+  // edge hit-testing and the OS resize cursor it draws — min/max size
+  // constraints set at window-creation time in overlay.ts are still
+  // enforced by Electron on setBounds regardless of the resizable flag.
+  ipcMain.on(IPC_CHANNELS.windowResize, (_event, bounds: WindowResizeBounds) => {
+    if (window.isDestroyed()) return
+    window.setBounds(bounds)
   })
 
   ipcMain.handle(IPC_CHANNELS.getSettings, () => readSettings())

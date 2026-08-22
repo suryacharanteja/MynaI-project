@@ -23,6 +23,7 @@ export const IPC_CHANNELS = {
   windowMinimize: 'window:minimize',
   windowRestore: 'window:restore',
   windowClose: 'window:close',
+  windowResize: 'window:resize',
   shortcutTriggered: 'shortcut:triggered',
   screenshotCapture: 'screenshot:capture'
 } as const
@@ -134,6 +135,15 @@ export interface ShortcutTriggeredEvent {
   id: ShortcutId
 }
 
+/** Partial window bounds for a manual, in-DOM resize drag — only the
+ *  fields that changed for this drag step are sent. */
+export interface WindowResizeBounds {
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+}
+
 export interface MynaiApi {
   getSettings: () => Promise<AppSettings>
   setSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>
@@ -157,6 +167,7 @@ export interface MynaiApi {
   windowMinimize: () => void
   windowRestore: () => void
   windowClose: () => void
+  resizeWindow: (bounds: WindowResizeBounds) => void
 
   onShortcutTriggered: (callback: (event: ShortcutTriggeredEvent) => void) => () => void
 

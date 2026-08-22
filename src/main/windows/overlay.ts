@@ -39,7 +39,13 @@ export function createOverlayWindow(options: OverlayWindowOptions): BrowserWindo
     transparent: true,
     alwaysOnTop: true,
     skipTaskbar: process.env['MYNAI_DEV_VISIBLE'] !== '1',
-    resizable: true,
+    // Native edge-resize is disabled deliberately — Electron/Windows draws
+    // its own double-arrow resize cursor for a resizable frameless
+    // window's non-client border, which is OS chrome outside the page's
+    // control and can't be styled away with CSS. Resize is reimplemented
+    // in-DOM instead (see resize-handles.tsx + IPC_CHANNELS.windowResize)
+    // so the cursor stays the app's own static default shape throughout.
+    resizable: false,
     minimizable: false,
     maximizable: false,
     closable: false,

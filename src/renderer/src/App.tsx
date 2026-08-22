@@ -3,6 +3,7 @@ import { Toaster } from 'sonner'
 import { CreateSessionScreen } from './features/session/CreateSessionScreen'
 import { OverlayHUD } from './features/overlay/OverlayHUD'
 import { MinimizedBubble } from './components/ui/minimized-bubble'
+import { ResizeHandles } from './components/ui/resize-handles'
 
 export default function App(): React.JSX.Element {
   const [screen, setScreen] = useState<'session' | 'overlay'>('session')
@@ -38,6 +39,8 @@ export default function App(): React.JSX.Element {
           }
         }}
       />
+
+      {!minimized && <ResizeHandles />}
 
       {/* Overlay HUD keeps running (audio/transcription) underneath the bubble while minimized. */}
       {screen === 'overlay' && (

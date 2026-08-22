@@ -7,6 +7,7 @@ import {
   type AskAiDoneEvent,
   type AskAiErrorEvent,
   type ShortcutTriggeredEvent,
+  type WindowResizeBounds,
   type MynaiApi
 } from '../shared/ipc-contract'
 import type { CreateSessionForm } from '../shared/session-types'
@@ -48,6 +49,7 @@ const api: MynaiApi = {
   windowMinimize: () => ipcRenderer.send(IPC_CHANNELS.windowMinimize),
   windowRestore: () => ipcRenderer.send(IPC_CHANNELS.windowRestore),
   windowClose: () => ipcRenderer.send(IPC_CHANNELS.windowClose),
+  resizeWindow: (bounds: WindowResizeBounds) => ipcRenderer.send(IPC_CHANNELS.windowResize, bounds),
 
   onShortcutTriggered: (callback: (event: ShortcutTriggeredEvent) => void) =>
     subscribe(IPC_CHANNELS.shortcutTriggered, callback),
