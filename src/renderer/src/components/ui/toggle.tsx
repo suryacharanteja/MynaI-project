@@ -1,4 +1,5 @@
 import { Check } from 'lucide-react'
+import { Tooltip } from './tooltip'
 
 export function Toggle({
   checked,
@@ -11,12 +12,11 @@ export function Toggle({
   label: string
   hint?: string
 }): React.JSX.Element {
-  return (
+  const button = (
     <button
       type="button"
       onClick={() => onChange(!checked)}
       className="flex items-center gap-2 text-sm text-neutral-700"
-      title={hint}
     >
       <span
         className={`flex h-4 w-4 items-center justify-center rounded border transition ${
@@ -28,4 +28,6 @@ export function Toggle({
       {label}
     </button>
   )
+
+  return hint ? <Tooltip label={hint}>{button}</Tooltip> : button
 }

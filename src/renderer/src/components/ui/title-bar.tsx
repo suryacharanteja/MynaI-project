@@ -1,5 +1,6 @@
 import { Home, Minus, Move, X } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Tooltip } from './tooltip'
 
 /**
  * Frameless windows (frame:false) have no native title bar to drag by.
@@ -24,44 +25,48 @@ export function TitleBar({
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       <div className="flex items-center gap-2 font-semibold text-neutral-900">
-        <span
-          className="flex items-center text-neutral-400"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-          title="Drag anywhere on this bar to move the window"
-        >
-          <Move size={14} />
-        </span>
+        <Tooltip label="Drag anywhere on this bar to move the window">
+          <span
+            className="flex items-center text-neutral-400"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          >
+            <Move size={14} />
+          </span>
+        </Tooltip>
         <span className="text-lg leading-none">🦜</span>
         <span>MynaI</span>
       </div>
       <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         {children}
         {onHome && (
-          <button
-            onClick={onHome}
-            title="Back to home"
-            className="rounded-full p-1.5 text-neutral-500 transition hover:bg-black/5 hover:text-neutral-900"
-          >
-            <Home size={16} />
-          </button>
+          <Tooltip label="Back to home">
+            <button
+              onClick={onHome}
+              className="rounded-full p-1.5 text-neutral-500 transition hover:bg-black/5 hover:text-neutral-900"
+            >
+              <Home size={16} />
+            </button>
+          </Tooltip>
         )}
         {onMinimize && (
-          <button
-            onClick={onMinimize}
-            title="Minimize to bubble"
-            className="rounded-full p-1.5 text-neutral-500 transition hover:bg-black/5 hover:text-neutral-900"
-          >
-            <Minus size={16} />
-          </button>
+          <Tooltip label="Minimize to bubble">
+            <button
+              onClick={onMinimize}
+              className="rounded-full p-1.5 text-neutral-500 transition hover:bg-black/5 hover:text-neutral-900"
+            >
+              <Minus size={16} />
+            </button>
+          </Tooltip>
         )}
         {onClose && (
-          <button
-            onClick={onClose}
-            title="Close MynaI"
-            className="rounded-full p-1.5 text-neutral-500 transition hover:bg-red-500/10 hover:text-red-600"
-          >
-            <X size={16} />
-          </button>
+          <Tooltip label="Close MynaI">
+            <button
+              onClick={onClose}
+              className="rounded-full p-1.5 text-neutral-500 transition hover:bg-red-500/10 hover:text-red-600"
+            >
+              <X size={16} />
+            </button>
+          </Tooltip>
         )}
       </div>
     </div>

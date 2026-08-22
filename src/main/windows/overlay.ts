@@ -79,6 +79,14 @@ export function createOverlayWindow(options: OverlayWindowOptions): BrowserWindo
     return ALLOWED_PERMISSIONS.has(permission)
   })
 
+  // Native right-click context menu is a separate OS-level popup, same
+  // stealth-breaking class as native title= tooltips — not covered by
+  // setContentProtection since Chromium renders it outside the window's
+  // own compositor surface.
+  overlay.webContents.on('context-menu', (event) => {
+    event.preventDefault()
+  })
+
   applyStealth(overlay, hideFromScreenCapture)
 
   overlay.webContents.on('did-finish-load', () => {

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Home, Mic, MicOff, Minus, Radio, Sparkles, X } from 'lucide-react'
 import { useOverlayStore } from '../../stores/overlay-store'
+import { Tooltip } from '../../components/ui/tooltip'
 
 export function TranscriptStrip({
   micOn,
@@ -44,17 +45,15 @@ export function TranscriptStrip({
     <div
       className="flex items-center gap-3 border-b border-white/10 bg-black/40 px-3 py-2"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-      title="Drag anywhere on this bar to move the window"
     >
-      <div
-        className="flex items-center gap-1.5 text-neutral-400"
-        title={systemAudioIssue ? 'System audio: connected but no sound detected' : `System audio: ${sttStatus.system}`}
-      >
-        <Radio
-          size={14}
-          className={systemAudioIssue ? 'text-amber-400' : isListening ? 'text-emerald-400' : undefined}
-        />
-      </div>
+      <Tooltip label={systemAudioIssue ? 'System audio: connected but no sound detected' : `System audio: ${sttStatus.system}`}>
+        <div className="flex items-center gap-1.5 text-neutral-400">
+          <Radio
+            size={14}
+            className={systemAudioIssue ? 'text-amber-400' : isListening ? 'text-emerald-400' : undefined}
+          />
+        </div>
+      </Tooltip>
 
       <div ref={scrollRef} className="flex-1 overflow-hidden whitespace-nowrap text-sm text-neutral-300">
         <span className="opacity-80">
@@ -87,42 +86,46 @@ export function TranscriptStrip({
         Auto Answer {autoAnswerOn ? 'On' : 'Off'}
       </button>
 
-      <button
-        onClick={onToggleMic}
-        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        title={micOn ? 'Mic on — click to mute' : 'Mic off — click to enable'}
-        className={`shrink-0 rounded-full p-1.5 transition ${
-          micOn ? 'bg-white/15 text-emerald-400' : 'bg-white/5 text-neutral-500'
-        }`}
-      >
-        {micOn ? <Mic size={14} /> : <MicOff size={14} />}
-      </button>
+      <Tooltip label={micOn ? 'Mic on — click to mute' : 'Mic off — click to enable'}>
+        <button
+          onClick={onToggleMic}
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          className={`shrink-0 rounded-full p-1.5 transition ${
+            micOn ? 'bg-white/15 text-emerald-400' : 'bg-white/5 text-neutral-500'
+          }`}
+        >
+          {micOn ? <Mic size={14} /> : <MicOff size={14} />}
+        </button>
+      </Tooltip>
 
       <div
         className="flex shrink-0 items-center gap-0.5 border-l border-white/10 pl-2"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
-        <button
-          onClick={onHome}
-          title="Back to home"
-          className="rounded-full p-1.5 text-neutral-400 transition hover:bg-white/10 hover:text-white"
-        >
-          <Home size={14} />
-        </button>
-        <button
-          onClick={onMinimize}
-          title="Minimize to bubble"
-          className="rounded-full p-1.5 text-neutral-400 transition hover:bg-white/10 hover:text-white"
-        >
-          <Minus size={14} />
-        </button>
-        <button
-          onClick={onClose}
-          title="Close MynaI"
-          className="rounded-full p-1.5 text-neutral-400 transition hover:bg-red-500/20 hover:text-red-400"
-        >
-          <X size={14} />
-        </button>
+        <Tooltip label="Back to home">
+          <button
+            onClick={onHome}
+            className="rounded-full p-1.5 text-neutral-400 transition hover:bg-white/10 hover:text-white"
+          >
+            <Home size={14} />
+          </button>
+        </Tooltip>
+        <Tooltip label="Minimize to bubble">
+          <button
+            onClick={onMinimize}
+            className="rounded-full p-1.5 text-neutral-400 transition hover:bg-white/10 hover:text-white"
+          >
+            <Minus size={14} />
+          </button>
+        </Tooltip>
+        <Tooltip label="Close MynaI">
+          <button
+            onClick={onClose}
+            className="rounded-full p-1.5 text-neutral-400 transition hover:bg-red-500/20 hover:text-red-400"
+          >
+            <X size={14} />
+          </button>
+        </Tooltip>
       </div>
     </div>
   )

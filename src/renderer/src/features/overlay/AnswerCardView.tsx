@@ -22,6 +22,7 @@ import type { ShortcutId } from '@shared/ipc-contract'
 import { MarkdownLite } from './MarkdownLite'
 import { useSessionStore } from '../../stores/session-store'
 import { useOverlayStore } from '../../stores/overlay-store'
+import { Tooltip } from '../../components/ui/tooltip'
 import { reAskCard, askFollowUp } from './ask-ai'
 
 /**
@@ -200,59 +201,64 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
                     capture of the interviewer repeating the question — the
                     natural "can you repeat that?" is already normal
                     interview behavior, unlike typing into an unknown window. */}
-                <button
-                  onClick={toggleReCapture}
-                  disabled={busy || (!systemReady && !reCaptureArmedForThisCard)}
-                  title={
+                <Tooltip
+                  label={
                     reCaptureArmedForThisCard
                       ? 'Listening — press again once the interviewer finishes repeating it'
                       : systemReady
                         ? 'Question captured wrong? Ask the interviewer to repeat it, press this, then press it again when they finish (Alt+Shift+R)'
                         : 'Waiting for system audio to connect'
                   }
-                  className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition disabled:opacity-40 ${
-                    reCaptureArmedForThisCard
-                      ? 'bg-red-500/20 text-red-300'
-                      : 'bg-white/5 text-neutral-400 hover:bg-white/15 hover:text-neutral-200'
-                  }`}
                 >
-                  {reCaptureArmedForThisCard ? (
-                    <>
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-400" />
-                      Listening… Stop &amp; Reask
-                      <Square size={9} />
-                    </>
-                  ) : (
-                    <>
-                      <Repeat size={10} />
-                      Re-listen
-                      <span className="text-neutral-600">Alt+Shift+R</span>
-                    </>
-                  )}
-                </button>
+                  <button
+                    onClick={toggleReCapture}
+                    disabled={busy || (!systemReady && !reCaptureArmedForThisCard)}
+                    className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition disabled:opacity-40 ${
+                      reCaptureArmedForThisCard
+                        ? 'bg-red-500/20 text-red-300'
+                        : 'bg-white/5 text-neutral-400 hover:bg-white/15 hover:text-neutral-200'
+                    }`}
+                  >
+                    {reCaptureArmedForThisCard ? (
+                      <>
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-400" />
+                        Listening… Stop &amp; Reask
+                        <Square size={9} />
+                      </>
+                    ) : (
+                      <>
+                        <Repeat size={10} />
+                        Re-listen
+                        <span className="text-neutral-600">Alt+Shift+R</span>
+                      </>
+                    )}
+                  </button>
+                </Tooltip>
                 {/* Fallback for when the interviewer can't be asked to repeat
                     (e.g. they've moved on) — typed correction, kept but demoted. */}
-                <button
-                  onClick={() => {
-                    setQuestionDraft(card.question)
-                    setEditingQuestion(true)
-                  }}
-                  title="Fallback: type the correct question yourself"
-                  className="text-[10px] text-neutral-600 underline decoration-dotted transition hover:text-neutral-400"
-                >
-                  Edit manually
-                </button>
+                <Tooltip label="Fallback: type the correct question yourself">
+                  <button
+                    onClick={() => {
+                      setQuestionDraft(card.question)
+                      setEditingQuestion(true)
+                    }}
+                    className="text-[10px] text-neutral-600 underline decoration-dotted transition hover:text-neutral-400"
+                  >
+                    Edit manually
+                  </button>
+                </Tooltip>
               </div>
             </div>
           )}
         </Section>
-        <button
-          onClick={handleCopy}
-          className="ml-2 shrink-0 rounded-md p-1.5 text-neutral-500 transition hover:bg-white/10 hover:text-neutral-300"
-          title="Copy answer"
-        >
-          {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-        </button>
+        <Tooltip label="Copy answer">
+          <button
+            onClick={handleCopy}
+            className="ml-2 shrink-0 rounded-md p-1.5 text-neutral-500 transition hover:bg-white/10 hover:text-neutral-300"
+          >
+            {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+          </button>
+        </Tooltip>
       </div>
 
       <AnswerBodyView body={card} />
@@ -271,11 +277,12 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
       {card.status !== 'streaming' && (
         <div className="flex flex-wrap items-center gap-1.5 border-t border-white/10 pt-3">
           {FOLLOW_UP_CHIPS.map((chip) => (
+            // No Tooltip here — the shortcut hint is already shown inline
+            // (the trailing <span>), so a hover tooltip would be redundant.
             <button
               key={chip.label}
               onClick={() => sendFollowUp(chip.instruction)}
               disabled={busy}
-              title={chip.hint}
               className="flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-xs text-neutral-300 transition hover:bg-white/15 disabled:opacity-40"
             >
               <Plus size={11} />
@@ -283,45 +290,49 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
               <span className="text-[10px] text-neutral-600">{chip.hint}</span>
             </button>
           ))}
-          <button
-            onClick={handleScreenshot}
-            disabled={busy}
-            title="Capture the screen and attach it as context for this question — useful when the interviewer shared a coding question visually (shared editor, pasted chat, a second portal)"
-            className="flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-xs text-neutral-300 transition hover:bg-white/15 disabled:opacity-40"
-          >
-            <Camera size={11} />
-            Screenshot
-          </button>
-          <button
-            onClick={toggleVoiceFollowUp}
-            disabled={busy || (!micReady && !voiceArmedForThisCard)}
-            title={
+          <Tooltip label="Capture the screen and attach it as context for this question — useful when the interviewer shared a coding question visually (shared editor, pasted chat, a second portal)">
+            <button
+              onClick={handleScreenshot}
+              disabled={busy}
+              className="flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-xs text-neutral-300 transition hover:bg-white/15 disabled:opacity-40"
+            >
+              <Camera size={11} />
+              Screenshot
+            </button>
+          </Tooltip>
+          <Tooltip
+            label={
               voiceArmedForThisCard
                 ? 'Listening — click to cancel'
                 : micReady
                   ? 'Speak a follow-up (Alt+Shift+V)'
                   : 'Turn on mic first to use voice follow-up'
             }
-            className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs transition disabled:opacity-40 ${
-              voiceArmedForThisCard
-                ? 'bg-red-500/20 text-red-300'
-                : 'bg-white/5 text-neutral-300 hover:bg-white/15'
-            }`}
           >
-            {voiceArmedForThisCard ? (
-              <>
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-400" />
-                Listening…
-                <X size={11} />
-              </>
-            ) : (
-              <>
-                <Mic size={11} />
-                Speak
-                <span className="text-[10px] text-neutral-600">Alt+Shift+V</span>
-              </>
-            )}
-          </button>
+            <button
+              onClick={toggleVoiceFollowUp}
+              disabled={busy || (!micReady && !voiceArmedForThisCard)}
+              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs transition disabled:opacity-40 ${
+                voiceArmedForThisCard
+                  ? 'bg-red-500/20 text-red-300'
+                  : 'bg-white/5 text-neutral-300 hover:bg-white/15'
+              }`}
+            >
+              {voiceArmedForThisCard ? (
+                <>
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-400" />
+                  Listening…
+                  <X size={11} />
+                </>
+              ) : (
+                <>
+                  <Mic size={11} />
+                  Speak
+                  <span className="text-[10px] text-neutral-600">Alt+Shift+V</span>
+                </>
+              )}
+            </button>
+          </Tooltip>
         </div>
       )}
     </div>
