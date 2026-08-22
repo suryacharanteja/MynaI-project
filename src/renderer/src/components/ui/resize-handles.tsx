@@ -75,17 +75,17 @@ export function ResizeHandles(): React.JSX.Element {
       <div
         onMouseDown={(e) => beginDrag('left', e)}
         style={handleStyle}
-        className="fixed left-0 top-0 z-[60] h-full w-1.5"
+        className="fixed left-0 top-0 z-[60] h-full w-3"
       />
       <div
         onMouseDown={(e) => beginDrag('right', e)}
         style={handleStyle}
-        className="fixed right-0 top-0 z-[60] h-full w-1.5"
+        className="fixed right-0 top-0 z-[60] h-full w-3"
       />
       <div
         onMouseDown={(e) => beginDrag('bottom', e)}
         style={handleStyle}
-        className="fixed bottom-0 left-0 z-[60] h-1.5 w-full"
+        className="fixed bottom-0 left-0 z-[60] h-3 w-full"
       />
     </>
   )
