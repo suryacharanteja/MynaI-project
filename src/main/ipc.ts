@@ -21,9 +21,10 @@ import {
   type WindowResizeBounds
 } from '../shared/ipc-contract'
 import type { DesktopSource } from '../shared/stt-types'
+import type { TranscriptMessage } from '../shared/transcript-types'
 import { readSettings, writeSettings } from './store'
 import { askLlm, type LlmError } from './services/llm/router'
-import { createSession, listSessions } from './sessions/store'
+import { appendTranscriptEntry, createSession, getSession, getSessionTranscript, listSessions } from './sessions/store'
 import { createAssemblyAiSttService } from './services/stt/assemblyai'
 import { safeSend } from './utils/safe-send'
 import {
@@ -120,6 +121,16 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   )
 
   ipcMain.handle(IPC_CHANNELS.listSessions, (): SessionSummary[] => listSessions())
+
+  ipcMain.handle(IPC_CHANNELS.getSession, (_event, id: string): SessionSummary | null => getSession(id))
+
+  ipcMain.on(IPC_CHANNELS.appendTranscriptEntry, (_event, sessionId: string, message: TranscriptMessage) => {
+    appendTranscriptEntry(sessionId, message)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.getSessionTranscript, (_event, id: string): TranscriptMessage[] =>
+    getSessionTranscript(id)
+  )
 
   ipcMain.handle(
     IPC_CHANNELS.aiAskStart,

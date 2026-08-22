@@ -8,6 +8,7 @@ import { FieldLabel, TextArea, TextInput } from '../../components/ui/field-shell
 import { Toggle } from '../../components/ui/toggle'
 import { Dropdown } from '../../components/ui/dropdown'
 import { SettingsModal } from '../settings/SettingsModal'
+import { SessionDetailModal } from '../../components/ui/session-detail-modal'
 import { TitleBar } from '../../components/ui/title-bar'
 import { CallSessionsList } from './CallSessionsList'
 
@@ -90,12 +91,13 @@ export function CreateSessionScreen({
   onCreate?: () => void
   onMinimize?: () => void
 }): React.JSX.Element {
-  const { form, setSessionType, setField } = useSessionStore()
+  const { form, setSessionType, setField, setSessionId } = useSessionStore()
   const [activeTab, setActiveTab] = useState<'create' | 'sessions'>('create')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [errors, setErrors] = useState<FieldErrors>({})
   const [hasApiKey, setHasApiKey] = useState(true)
+  const [viewingSessionId, setViewingSessionId] = useState<string | null>(null)
 
   useEffect(() => {
     window.mynai.getSettings().then((settings) => {
@@ -140,6 +142,7 @@ export function CreateSessionScreen({
         return
       }
       toast.success('Session created')
+      setSessionId(result.sessionId)
       onCreate?.()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create session')
@@ -151,6 +154,9 @@ export function CreateSessionScreen({
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden rounded-2xl border border-black/10 bg-white/95 text-neutral-900 shadow-2xl backdrop-blur-xl">
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      {viewingSessionId && (
+        <SessionDetailModal sessionId={viewingSessionId} onClose={() => setViewingSessionId(null)} />
+      )}
 
       <TitleBar
         onMinimize={onMinimize ?? (() => window.mynai.windowMinimize())}
@@ -185,7 +191,7 @@ export function CreateSessionScreen({
       </div>
 
       {activeTab === 'sessions' ? (
-        <CallSessionsList />
+        <CallSessionsList onOpenSession={setViewingSessionId} />
       ) : (
         <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4">
           {/* Session Type */}

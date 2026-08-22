@@ -274,13 +274,23 @@ export function useLiveTranscription() {
       // worse than silently dropping one turn's worth of audio.
       if (isLikelyGarbledTranscript(e.text)) return
 
-      addTranscriptMessage({
+      const message = {
         id: `${e.source}-${Date.now()}`,
         source: e.source,
         text: e.text,
         isFinal: true,
         timestamp: Date.now()
-      })
+      }
+      addTranscriptMessage(message)
+
+      // Mirror to disk when the user opted in — separate from the in-memory
+      // store above, which is capped to the last 50 messages for the live
+      // UI strip and would silently truncate a saved transcript if reused
+      // as the source of truth here.
+      const { sessionId, form } = useSessionStore.getState()
+      if (form.saveTranscript && sessionId) {
+        window.mynai.appendTranscriptEntry(sessionId, message)
+      }
 
       // Voice follow-up: while a card has arming enabled (user pressed "Speak"
       // or its shortcut), redirect the candidate's own mic speech into that

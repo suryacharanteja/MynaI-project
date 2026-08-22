@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Briefcase, Phone, Loader2 } from 'lucide-react'
 import type { SessionSummary } from '@shared/ipc-contract'
 
-export function CallSessionsList(): React.JSX.Element {
+export function CallSessionsList({ onOpenSession }: { onOpenSession: (id: string) => void }): React.JSX.Element {
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null)
 
   useEffect(() => {
@@ -30,7 +30,8 @@ export function CallSessionsList(): React.JSX.Element {
       {sessions.map((session) => (
         <div
           key={session.id}
-          className="flex items-center justify-between rounded-lg border border-black/10 bg-black/[0.02] px-3 py-2.5"
+          onClick={() => onOpenSession(session.id)}
+          className="flex cursor-default items-center justify-between rounded-lg border border-black/10 bg-black/[0.02] px-3 py-2.5 transition hover:bg-black/[0.06]"
         >
           <div className="flex items-center gap-2 text-sm text-neutral-800">
             {session.form.sessionType === 'interview' ? <Briefcase size={14} /> : <Phone size={14} />}

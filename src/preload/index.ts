@@ -12,6 +12,7 @@ import {
 } from '../shared/ipc-contract'
 import type { CreateSessionForm } from '../shared/session-types'
 import type { SttErrorEvent, SttStatusEvent, SttTranscriptEvent } from '../shared/stt-types'
+import type { TranscriptMessage } from '../shared/transcript-types'
 
 function subscribe<T>(channel: string, callback: (event: T) => void): () => void {
   const listener = (_event: Electron.IpcRendererEvent, payload: T): void => callback(payload)
@@ -24,6 +25,10 @@ const api: MynaiApi = {
   setSettings: (patch: Partial<AppSettings>) => ipcRenderer.invoke(IPC_CHANNELS.setSettings, patch),
   createSession: (form: CreateSessionForm) => ipcRenderer.invoke(IPC_CHANNELS.createSession, form),
   listSessions: () => ipcRenderer.invoke(IPC_CHANNELS.listSessions),
+  getSession: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.getSession, id),
+  appendTranscriptEntry: (sessionId: string, message: TranscriptMessage) =>
+    ipcRenderer.send(IPC_CHANNELS.appendTranscriptEntry, sessionId, message),
+  getSessionTranscript: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.getSessionTranscript, id),
   askAiStart: (request: AskAiRequest) => ipcRenderer.invoke(IPC_CHANNELS.aiAskStart, request),
   onAiChunk: (callback: (event: AskAiChunkEvent) => void) => subscribe(IPC_CHANNELS.aiChunk, callback),
   onAiDone: (callback: (event: AskAiDoneEvent) => void) => subscribe(IPC_CHANNELS.aiDone, callback),

@@ -1,5 +1,6 @@
 import type { AnswerPreferences, CreateSessionForm, LlmProvider } from './session-types'
 import type { DesktopSource, SttErrorEvent, SttStatusEvent, SttTranscriptEvent } from './stt-types'
+import type { TranscriptMessage } from './transcript-types'
 
 export type { LlmProvider } from './session-types'
 
@@ -8,6 +9,9 @@ export const IPC_CHANNELS = {
   setSettings: 'app:setSettings',
   createSession: 'session:create',
   listSessions: 'session:list',
+  getSession: 'session:get',
+  appendTranscriptEntry: 'session:appendTranscript',
+  getSessionTranscript: 'session:getTranscript',
   aiAskStart: 'ai:askStart',
   aiChunk: 'ai:chunk',
   aiDone: 'ai:done',
@@ -149,6 +153,9 @@ export interface MynaiApi {
   setSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>
   createSession: (form: CreateSessionForm) => Promise<CreateSessionResult | CreateSessionError>
   listSessions: () => Promise<SessionSummary[]>
+  getSession: (id: string) => Promise<SessionSummary | null>
+  appendTranscriptEntry: (sessionId: string, message: TranscriptMessage) => void
+  getSessionTranscript: (id: string) => Promise<TranscriptMessage[]>
   askAiStart: (request: AskAiRequest) => Promise<AskAiStartResult>
   onAiChunk: (callback: (event: AskAiChunkEvent) => void) => () => void
   onAiDone: (callback: (event: AskAiDoneEvent) => void) => () => void
