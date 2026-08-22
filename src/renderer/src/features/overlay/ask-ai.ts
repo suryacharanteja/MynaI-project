@@ -10,7 +10,7 @@ type RequestMode = 'ask' | 'regenerate' | 'follow-up'
 interface InFlightRequest {
   mode: RequestMode
   instruction?: string
-  imageDataUrl?: string
+  imageDataUrls?: string[]
   accumulated: string
   flushTimer: ReturnType<typeof setTimeout> | null
   resolve: (result: { error?: string }) => void
@@ -34,7 +34,7 @@ function flush(cardId: string): void {
         explanation: parsed.explanation || undefined,
         timeComplexity: parsed.timeComplexity ?? undefined,
         spaceComplexity: parsed.spaceComplexity ?? undefined,
-        imageDataUrl: req.imageDataUrl
+        imageDataUrls: req.imageDataUrls
       }
     })
     return
@@ -123,7 +123,7 @@ window.mynai.onAiError(({ cardId, error, partial }) => {
     // attempt itself failed. Surface the error via a toast-free inline note
     // dropped into pendingFollowUp so AnswerCardView can show it, then clear it.
     updateCard(cardId, {
-      pendingFollowUp: { instruction: req.instruction ?? '', answer: `⚠️ ${error}`, imageDataUrl: req.imageDataUrl }
+      pendingFollowUp: { instruction: req.instruction ?? '', answer: `⚠️ ${error}`, imageDataUrls: req.imageDataUrls }
     })
     inFlight.delete(cardId)
     req.resolve({ error })
@@ -146,7 +146,8 @@ function baseRequestFields(form: CreateSessionForm) {
     model: form.model,
     company: form.company || undefined,
     jobDescription: form.jobDescription || undefined,
-    extraContext: form.extraContext || undefined
+    extraContext: form.extraContext || undefined,
+    sessionType: form.sessionType
   }
 }
 
@@ -242,7 +243,7 @@ export async function askFollowUp(
   cardId: string,
   instruction: string,
   form: CreateSessionForm,
-  imageDataUrl?: string
+  imageDataUrls?: string[]
 ): Promise<{ error?: string }> {
   const { cards, updateCard } = useOverlayStore.getState()
   const card = cards.find((c) => c.id === cardId)
@@ -257,10 +258,17 @@ export async function askFollowUp(
     spaceComplexity: card.spaceComplexity
   }
 
-  updateCard(cardId, { pendingFollowUp: { instruction, answer: '', imageDataUrl } })
+  updateCard(cardId, { pendingFollowUp: { instruction, answer: '', imageDataUrls } })
 
   return new Promise((resolve) => {
-    inFlight.set(cardId, { mode: 'follow-up', instruction, imageDataUrl, accumulated: '', flushTimer: null, resolve })
+    inFlight.set(cardId, {
+      mode: 'follow-up',
+      instruction,
+      imageDataUrls,
+      accumulated: '',
+      flushTimer: null,
+      resolve
+    })
 
     window.mynai
       .askAiStart({
@@ -269,19 +277,19 @@ export async function askFollowUp(
         ...baseRequestFields(form),
         followUpInstruction: instruction,
         priorAnswer,
-        imageDataUrl
+        imageDataUrls
       })
       .then((result) => {
         if (result.error) {
           inFlight.delete(cardId)
-          updateCard(cardId, { pendingFollowUp: { instruction, answer: `⚠️ ${result.error}`, imageDataUrl } })
+          updateCard(cardId, { pendingFollowUp: { instruction, answer: `⚠️ ${result.error}`, imageDataUrls } })
           resolve({ error: result.error })
         }
       })
       .catch((err) => {
         inFlight.delete(cardId)
         const message = err instanceof Error ? err.message : 'Follow-up failed.'
-        updateCard(cardId, { pendingFollowUp: { instruction, answer: `⚠️ ${message}`, imageDataUrl } })
+        updateCard(cardId, { pendingFollowUp: { instruction, answer: `⚠️ ${message}`, imageDataUrls } })
         resolve({ error: message })
       })
   })

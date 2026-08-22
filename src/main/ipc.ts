@@ -171,7 +171,8 @@ export function registerIpcHandlers(window: BrowserWindow): void {
           answerPreferences: req.answerPreferences,
           followUpInstruction: req.followUpInstruction,
           priorAnswer: req.priorAnswer,
-          imageDataUrl: req.imageDataUrl
+          imageDataUrls: req.imageDataUrls,
+          sessionType: req.sessionType
         },
         (delta) => safeSend(window.webContents, IPC_CHANNELS.aiChunk, { cardId: req.cardId, delta })
       ).then(

@@ -70,7 +70,8 @@ export const askAiRequestSchema = z.object({
   answerPreferences: answerPreferencesSchema.optional(),
   followUpInstruction: z.string().min(1).optional(),
   priorAnswer: priorAnswerSchema.optional(),
-  imageDataUrl: z.string().startsWith('data:image/').optional()
+  imageDataUrls: z.array(z.string().startsWith('data:image/')).optional(),
+  sessionType: z.enum(SESSION_TYPES).optional()
 })
 
 export const answerResultSchema = z.object({

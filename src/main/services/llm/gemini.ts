@@ -11,17 +11,21 @@ export async function askGemini(params: AskParams, onChunk: (text: string) => vo
   const genAI = new GoogleGenerativeAI(params.apiKey)
   const generativeModel = genAI.getGenerativeModel({ model: params.model })
 
-  const image = params.imageDataUrl ? parseDataUrl(params.imageDataUrl) : null
-  const request = image
-    ? {
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: buildPrompt(params) }, { inlineData: { mimeType: image.mimeType, data: image.data } }]
-          }
-        ]
-      }
-    : buildPrompt(params)
+  const images = (params.imageDataUrls ?? []).map(parseDataUrl).filter((img) => img !== null)
+  const request =
+    images.length > 0
+      ? {
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                { text: buildPrompt(params) },
+                ...images.map((image) => ({ inlineData: { mimeType: image.mimeType, data: image.data } }))
+              ]
+            }
+          ]
+        }
+      : buildPrompt(params)
 
   const result = await generativeModel.generateContentStream(request)
   for await (const chunk of result.stream) {

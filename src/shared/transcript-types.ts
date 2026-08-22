@@ -16,9 +16,10 @@ export interface FollowUpEntry {
   explanation?: string
   timeComplexity?: string
   spaceComplexity?: string
-  /** Present when this follow-up attached a screenshot — shown as a
-   *  thumbnail so the candidate can confirm what was actually captured. */
-  imageDataUrl?: string
+  /** Present when this follow-up attached one or more screenshots — shown
+   *  as thumbnails so the candidate can confirm what was actually
+   *  captured. */
+  imageDataUrls?: string[]
   createdAt: number
 }
 

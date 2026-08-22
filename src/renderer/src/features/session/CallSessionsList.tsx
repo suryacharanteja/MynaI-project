@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Briefcase, Phone, Loader2 } from 'lucide-react'
+import { Briefcase, Code2, Loader2 } from 'lucide-react'
 import type { SessionSummary } from '@shared/ipc-contract'
 
 export function CallSessionsList({ onOpenSession }: { onOpenSession: (id: string) => void }): React.JSX.Element {
@@ -34,7 +34,7 @@ export function CallSessionsList({ onOpenSession }: { onOpenSession: (id: string
           className="flex cursor-default items-center justify-between rounded-lg border border-black/10 bg-black/[0.02] px-3 py-2.5 transition hover:bg-black/[0.06]"
         >
           <div className="flex items-center gap-2 text-sm text-neutral-800">
-            {session.form.sessionType === 'interview' ? <Briefcase size={14} /> : <Phone size={14} />}
+            {session.form.sessionType === 'interview' ? <Briefcase size={14} /> : <Code2 size={14} />}
             <span className="font-medium">{session.form.company || 'Untitled session'}</span>
           </div>
           <span className="text-xs text-neutral-400">

@@ -64,6 +64,7 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
   const [editingQuestion, setEditingQuestion] = useState(false)
   const [questionDraft, setQuestionDraft] = useState(card.question)
   const [followUpBusy, setFollowUpBusy] = useState(false)
+  const [stagedScreenshots, setStagedScreenshots] = useState<string[]>([])
   const voiceFollowUpCardId = useOverlayStore((s) => s.voiceFollowUpCardId)
   const setVoiceFollowUpCardId = useOverlayStore((s) => s.setVoiceFollowUpCardId)
   const reCaptureCardId = useOverlayStore((s) => s.reCaptureCardId)
@@ -94,21 +95,33 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
     setReCaptureCardId(reCaptureArmedForThisCard ? null : card.id)
   }
 
+  // Stages a capture instead of sending it immediately, so a question that
+  // doesn't fit in one screen (needs scrolling) can be covered by taking
+  // several shots and sending them together — see handleSendScreenshots.
   async function handleScreenshot(): Promise<void> {
     if (busy) return
+    const result = await window.mynai.screenshotCapture()
+    if (result.error || !result.dataUrl) {
+      toast.error(result.error ?? 'Screenshot capture failed.')
+      return
+    }
+    setStagedScreenshots((prev) => [...prev, result.dataUrl as string])
+  }
+
+  function removeStagedScreenshot(index: number): void {
+    setStagedScreenshots((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  async function handleSendScreenshots(): Promise<void> {
+    if (busy || stagedScreenshots.length === 0) return
     setFollowUpBusy(true)
     try {
-      const result = await window.mynai.screenshotCapture()
-      if (result.error || !result.dataUrl) {
-        toast.error(result.error ?? 'Screenshot capture failed.')
-        return
-      }
-      await askFollowUp(
-        card.id,
-        'Use the attached screenshot — it may show code, a diagram, or on-screen context — to inform or extend this answer.',
-        useSessionStore.getState().form,
-        result.dataUrl
-      )
+      const instruction =
+        stagedScreenshots.length === 1
+          ? 'Use the attached screenshot — it may show code, a diagram, or on-screen context — to inform or extend this answer.'
+          : 'Use the attached screenshots — successive captures of the same content — to inform or extend this answer.'
+      await askFollowUp(card.id, instruction, useSessionStore.getState().form, stagedScreenshots)
+      setStagedScreenshots([])
     } finally {
       setFollowUpBusy(false)
     }
@@ -274,6 +287,36 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
 
       {card.pendingFollowUp && <PendingFollowUpBlock pending={card.pendingFollowUp} busy={followUpBusy} />}
 
+      {stagedScreenshots.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-white/10 pt-3">
+          {stagedScreenshots.map((dataUrl, i) => (
+            <div key={i} className="relative">
+              <img
+                src={dataUrl}
+                alt={`Staged screenshot ${i + 1}`}
+                className="h-12 w-16 rounded border border-white/10 object-cover"
+              />
+              <button
+                onClick={() => removeStagedScreenshot(i)}
+                className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-neutral-900 text-neutral-300 hover:bg-red-500/40 hover:text-red-200"
+              >
+                <X size={10} />
+              </button>
+            </div>
+          ))}
+          <Tooltip label={`Send ${stagedScreenshots.length} screenshot${stagedScreenshots.length > 1 ? 's' : ''} with this follow-up`}>
+            <button
+              onClick={handleSendScreenshots}
+              disabled={busy}
+              className="flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs text-emerald-300 transition hover:bg-emerald-500/30 disabled:opacity-40"
+            >
+              <Check size={11} />
+              Send {stagedScreenshots.length}
+            </button>
+          </Tooltip>
+        </div>
+      )}
+
       {card.status !== 'streaming' && (
         <div className="flex flex-wrap items-center gap-1.5 border-t border-white/10 pt-3">
           {FOLLOW_UP_CHIPS.map((chip) => (
@@ -290,14 +333,14 @@ export function AnswerCardView({ card }: { card: AnswerCard }): React.JSX.Elemen
               <span className="text-[10px] text-neutral-600">{chip.hint}</span>
             </button>
           ))}
-          <Tooltip label="Capture the screen and attach it as context for this question — useful when the interviewer shared a coding question visually (shared editor, pasted chat, a second portal)">
+          <Tooltip label="Capture the screen and stage it as context for this question — click again to add more (e.g. after scrolling), then Send">
             <button
               onClick={handleScreenshot}
               disabled={busy}
               className="flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-xs text-neutral-300 transition hover:bg-white/15 disabled:opacity-40"
             >
               <Camera size={11} />
-              Screenshot
+              Screenshot{stagedScreenshots.length > 0 ? ` (${stagedScreenshots.length})` : ''}
             </button>
           </Tooltip>
           <Tooltip
@@ -393,12 +436,17 @@ function FollowUpBlock({ entry }: { entry: FollowUpEntry }): React.JSX.Element {
   return (
     <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.03] p-3">
       <p className="text-xs font-medium text-neutral-400">↳ {entry.instruction}</p>
-      {entry.imageDataUrl && (
-        <img
-          src={entry.imageDataUrl}
-          alt="Attached screenshot"
-          className="max-h-24 w-auto rounded border border-white/10 object-contain"
-        />
+      {entry.imageDataUrls && entry.imageDataUrls.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {entry.imageDataUrls.map((url, i) => (
+            <img
+              key={i}
+              src={url}
+              alt={`Attached screenshot ${i + 1}`}
+              className="max-h-24 w-auto rounded border border-white/10 object-contain"
+            />
+          ))}
+        </div>
       )}
       {isError ? (
         <p className="text-xs text-red-400">{entry.answer}</p>
@@ -420,12 +468,17 @@ function PendingFollowUpBlock({
   return (
     <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.03] p-3">
       <p className="text-xs font-medium text-neutral-400">↳ {pending.instruction}</p>
-      {pending.imageDataUrl && (
-        <img
-          src={pending.imageDataUrl}
-          alt="Attached screenshot"
-          className="max-h-24 w-auto rounded border border-white/10 object-contain"
-        />
+      {pending.imageDataUrls && pending.imageDataUrls.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {pending.imageDataUrls.map((url, i) => (
+            <img
+              key={i}
+              src={url}
+              alt={`Attached screenshot ${i + 1}`}
+              className="max-h-24 w-auto rounded border border-white/10 object-contain"
+            />
+          ))}
+        </div>
       )}
       {isError ? (
         <p className="text-xs text-red-400">{pending.answer}</p>

@@ -1,4 +1,4 @@
-import type { AnswerPreferences, CreateSessionForm, LlmProvider } from './session-types'
+import type { AnswerPreferences, CreateSessionForm, LlmProvider, SessionType } from './session-types'
 import type { DesktopSource, SttErrorEvent, SttStatusEvent, SttTranscriptEvent } from './stt-types'
 import type { TranscriptMessage } from './transcript-types'
 
@@ -97,10 +97,14 @@ export interface AskAiRequest {
   /** Set only for a follow-up ask on an existing card — see priorAnswer. */
   followUpInstruction?: string
   priorAnswer?: PriorAnswerPayload
-  /** A screenshot attached to this specific follow-up as extra visual
-   *  context (e.g. a coding question shown on screen) — a data URL
-   *  ("data:image/png;base64,..."). */
-  imageDataUrl?: string
+  /** Screenshot(s) attached to this specific follow-up as extra visual
+   *  context (e.g. a coding question shown on screen, possibly spanning
+   *  several scrolled captures) — data URLs ("data:image/png;base64,..."). */
+  imageDataUrls?: string[]
+  /** The session's type, so the prompt can be steered (e.g. "Coding
+   *  Challenge" sessions get a solving-a-problem framing instead of an
+   *  interview framing). */
+  sessionType?: SessionType
 }
 
 export interface ScreenshotCaptureResult {

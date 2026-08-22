@@ -1,4 +1,4 @@
-import type { AnswerPreferences } from '../../../shared/session-types'
+import type { AnswerPreferences, SessionType } from '../../../shared/session-types'
 
 export type LlmProvider = 'gemini' | 'openai' | 'opencode-go' | 'opencode-zen' | 'deepseek'
 
@@ -27,11 +27,14 @@ export interface AskParams {
    *  about the same question. When set, buildPrompt returns a follow-up
    *  prompt instead of a fresh-question prompt. */
   followUpInstruction?: string
-  /** A screenshot attached as extra visual context — a data URL
-   *  ("data:image/png;base64,..."). The image itself is attached to the
-   *  provider request separately (see gemini.ts/openai-compatible.ts); this
-   *  field only controls whether the TEXT prompt references it. */
-  imageDataUrl?: string
+  /** Screenshot(s) attached as extra visual context — data URLs
+   *  ("data:image/png;base64,..."). The images themselves are attached to
+   *  the provider request separately (see gemini.ts/openai-compatible.ts);
+   *  this field only controls whether/how the TEXT prompt references them. */
+  imageDataUrls?: string[]
+  /** Steers the prompt's framing — e.g. a Coding Challenge session gets a
+   *  problem-solving framing instead of an interview-candidate framing. */
+  sessionType?: SessionType
 }
 
 /**
@@ -89,7 +92,7 @@ export function buildPrompt(params: AskParams): string {
   }
 
   return [
-    'You are answering as the candidate, in first person, in an interview or meeting.',
+    codingChallengeOpeningLine(params.sessionType),
     contextLines.length > 0 ? contextLines.join('\n') : null,
     prefLines.length > 0 ? prefLines.join(' ') : null,
     `Question: ${params.question}`,
@@ -97,6 +100,18 @@ export function buildPrompt(params: AskParams): string {
   ]
     .filter(Boolean)
     .join('\n\n')
+}
+
+/**
+ * 'regular-call' is the Coding Challenge session type's underlying literal
+ * (kept unchanged from its original "Regular Call" name to avoid breaking
+ * saveTranscript.safeParse for sessions already on disk under the old
+ * label — only the UI-facing label/icon changed, see CreateSessionScreen.tsx).
+ */
+function codingChallengeOpeningLine(sessionType: SessionType | undefined): string {
+  return sessionType === 'regular-call'
+    ? 'You are solving a coding/algorithm challenge (LeetCode/HackerRank-style). Give a correct, runnable solution and always include its time and space complexity.'
+    : 'You are answering as the candidate, in first person, in an interview or meeting.'
 }
 
 function buildFollowUpPrompt(prior: PriorAnswerSummary, instruction: string, params: AskParams): string {
@@ -110,12 +125,14 @@ function buildFollowUpPrompt(prior: PriorAnswerSummary, instruction: string, par
   ].filter(Boolean)
 
   return [
-    'You are answering as the candidate, in first person, in an interview or meeting. You already gave an answer to this question, and the candidate now wants to add something to it.',
+    `${codingChallengeOpeningLine(params.sessionType)} You already gave an answer to this question, and the candidate now wants to add something to it.`,
     `Original question: ${params.question}`,
     `Your existing answer so far:\n${priorSummaryLines.join('\n')}`,
     `Additional request: ${instruction}`,
-    params.imageDataUrl
-      ? 'A screenshot is attached — it may show code, a diagram, or other on-screen context relevant to this question. Use it.'
+    params.imageDataUrls && params.imageDataUrls.length > 0
+      ? params.imageDataUrls.length === 1
+        ? 'A screenshot is attached — it may show code, a diagram, or other on-screen context relevant to this question. Use it.'
+        : `${params.imageDataUrls.length} screenshots are attached (e.g. successive scrolled captures of the same content) — they may show code, a diagram, or other on-screen context relevant to this question. Use them together.`
       : null,
     "Respond with ONLY the new or updated sections needed to satisfy the additional request — do not repeat the full original answer.",
     RESPONSE_FORMAT_INSTRUCTIONS

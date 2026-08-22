@@ -26,12 +26,13 @@ export async function askOpenAiCompatible(
       messages: [
         {
           role: 'user',
-          content: params.imageDataUrl
-            ? [
-                { type: 'text', text: buildPrompt(params) },
-                { type: 'image_url', image_url: { url: params.imageDataUrl } }
-              ]
-            : buildPrompt(params)
+          content:
+            params.imageDataUrls && params.imageDataUrls.length > 0
+              ? [
+                  { type: 'text', text: buildPrompt(params) },
+                  ...params.imageDataUrls.map((url) => ({ type: 'image_url', image_url: { url } }))
+                ]
+              : buildPrompt(params)
         }
       ],
       temperature: 0.4,

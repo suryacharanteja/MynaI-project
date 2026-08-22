@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Briefcase, Phone, FileText, User, Plus, Sparkles, MessageSquare, Settings } from 'lucide-react'
+import { Briefcase, Code2, FileText, User, Plus, Sparkles, MessageSquare, Settings } from 'lucide-react'
 import { toast } from 'sonner'
 import type { LlmProvider } from '@shared/session-types'
 import { createSessionFormSchema } from '@shared/schemas'
@@ -216,7 +216,7 @@ export function CreateSessionScreen({
                     : 'border-black/10 bg-black/[0.02] text-neutral-400 hover:text-neutral-700'
                 }`}
               >
-                <Phone size={16} /> Regular Call
+                <Code2 size={16} /> Coding Challenge
               </button>
             </div>
           </div>
