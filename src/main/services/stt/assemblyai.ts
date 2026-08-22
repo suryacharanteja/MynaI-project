@@ -187,7 +187,15 @@ export function createAssemblyAiSttService(webContents: WebContents) {
 
     const query = new URLSearchParams({
       sample_rate: String(SAMPLE_RATE),
-      format_turns: 'true'
+      format_turns: 'true',
+      // Without this, AssemblyAI's documented default is the multilingual
+      // model with "no steering... code-switches natively across all of its
+      // supported languages" — it was genuinely trying to detect whatever
+      // language it thought it heard, which is why clear English speech
+      // sometimes came back as Chinese/Hindi/etc. This is a dedicated
+      // English-only model, not just biasing a multilingual one toward
+      // English — it can't output another language's script at all.
+      speech_model: 'universal-streaming-english'
     })
     const ws = new WebSocket(`wss://${host}/v3/ws?${query.toString()}`, {
       headers: { Authorization: apiKey }
